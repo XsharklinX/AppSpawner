@@ -1,0 +1,2 @@
+[build]
+jobs = 4  # limitar workers paralelos evita colisiones de archivo en Windows

@@ -1,0 +1,37 @@
+# ── Dependencias ─────────────────────────────────────────────────────────────
+node_modules/
+
+# ── Build output ──────────────────────────────────────────────────────────────
+dist/
+release/
+out/
+
+# ── Tauri (abandonado) ────────────────────────────────────────────────────────
+src-tauri/target/
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# ── Sistema operativo ────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── Accesos directos de Windows ──────────────────────────────────────────────
+*.lnk
+
+# ── Editor ───────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.suo
+*.user
+
+# ── Datos locales del usuario (no subir credenciales ni caché) ────────────────
+# (el userData de Electron se guarda en AppData, no en el repo)
+appspawner-data.json
+appspawner-data.bak.json
+
+# ── Preview de iconos (generado) ─────────────────────────────────────────────
+assets/preview.html

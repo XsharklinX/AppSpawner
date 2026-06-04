@@ -1,0 +1,149 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Variables CSS base ─────────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    --drag-region: 32px; /* Alto del área de arrastre de la ventana */
+  }
+
+  html.light {
+    --bg-base:     248 250 252;
+    --bg-card:     255 255 255;
+    --text-muted:  100 116 139;
+  }
+
+  html.dark, html {
+    --bg-base:    9 9 14;
+    --bg-card:    17 17 24;
+    --text-muted: 139 139 158;
+  }
+}
+
+/* ── Clases utilitarias de diseño ────────────────────────────────────────────── */
+@layer components {
+  /* Glass morphism card */
+  .glass {
+    @apply bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl;
+  }
+  .glass-hover {
+    @apply hover:bg-white/[0.05] hover:border-white/[0.09] transition-all duration-200;
+  }
+
+  /* Gradiente de texto de acento */
+  .text-gradient {
+    @apply bg-gradient-to-r from-violet-400 via-purple-400 to-blue-400 bg-clip-text text-transparent;
+  }
+
+  /* Botón de acción primario */
+  .btn-primary {
+    @apply bg-violet-600 hover:bg-violet-500 active:scale-[0.97]
+           text-white font-medium rounded-xl px-4 py-2
+           transition-all duration-150 select-none
+           shadow-glow-sm hover:shadow-glow;
+  }
+
+  /* Botón secundario (ghost) */
+  .btn-ghost {
+    @apply bg-white/[0.04] hover:bg-white/[0.08] active:scale-[0.97]
+           text-white/80 hover:text-white font-medium rounded-xl px-4 py-2
+           border border-white/[0.06] hover:border-white/[0.12]
+           transition-all duration-150 select-none;
+  }
+
+  /* Input de formulario */
+  .input-field {
+    @apply w-full bg-white/[0.04] border border-white/[0.08] focus:border-violet-500/60
+           rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30
+           outline-none transition-all duration-150
+           focus:bg-white/[0.06] focus:ring-2 focus:ring-violet-500/20;
+  }
+
+  /* Etiqueta de formulario */
+  .form-label {
+    @apply block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wider;
+  }
+
+  /* Separador horizontal */
+  .divider {
+    @apply border-t border-white/[0.06];
+  }
+
+  /* Badge de categoría */
+  .category-badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium
+           bg-white/[0.06] text-white/60 border border-white/[0.06];
+  }
+}
+
+/* ── Scrollbar personalizado ─────────────────────────────────────────────────── */
+@layer utilities {
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar       { width: 4px; }
+  .scrollbar-thin::-webkit-scrollbar-track  { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+  /* Región de arrastre de ventana (Electron drag) */
+  .drag-region {
+    -webkit-app-region: drag;
+  }
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+
+  /* Shimmer skeleton loading */
+  .skeleton {
+    @apply rounded-xl bg-white/[0.04] overflow-hidden relative;
+  }
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0 bg-shimmer-gradient bg-[length:200%_100%] animate-shimmer;
+  }
+}
+
+/* ── Tipografía global ───────────────────────────────────────────────────────── */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  /* Desactivar selección de texto por defecto (app de escritorio) */
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+
+/* Re-habilitar selección en inputs */
+input, textarea, [contenteditable] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Transición global para cambios de tema */
+*, *::before, *::after {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+/* Desactivar transición en animaciones para no interferir */
+[class*="animate-"] {
+  transition: none;
+}

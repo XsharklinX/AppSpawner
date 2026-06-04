@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+
+    <!-- Background: near-black with very subtle center warmth -->
+    <radialGradient id="bgGrad" cx="50%" cy="48%" r="70%">
+      <stop offset="0%"   stop-color="#14142a"/>
+      <stop offset="100%" stop-color="#080810"/>
+    </radialGradient>
+
+    <!-- Window fills: gradient top→bottom, lighter top (chrome bar), darker body -->
+    <linearGradient id="wViolet" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#3b0764"/>
+    </linearGradient>
+    <linearGradient id="wBlue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#0f2460"/>
+    </linearGradient>
+    <linearGradient id="wEmerald" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#059669"/>
+      <stop offset="100%" stop-color="#022c22"/>
+    </linearGradient>
+
+    <!-- Central orb: cool purple, specular highlight top-left -->
+    <radialGradient id="orbGrad" cx="38%" cy="32%" r="68%">
+      <stop offset="0%"   stop-color="#ede9fe"/>
+      <stop offset="40%"  stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#5b21b6"/>
+    </radialGradient>
+
+    <!-- Tray glow behind the orb -->
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#7c3aed" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+    </radialGradient>
+
+  </defs>
+
+  <!-- ─── Background ──────────────────────────────────────────────────────── -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+
+  <!-- ─── Orbit ring (very faint dashed circle) ───────────────────────────── -->
+  <circle cx="256" cy="256" r="130"
+    fill="none"
+    stroke="white"
+    stroke-width="1"
+    stroke-opacity="0.07"
+    stroke-dasharray="5 9"/>
+
+  <!-- ─── Connector lines (behind windows, overlap hidden by shapes) ───────── -->
+
+  <!-- Core → Window top (violet) -->
+  <line x1="256" y1="226" x2="256" y2="159"
+    stroke="#8b5cf6" stroke-width="2" stroke-opacity="0.45"
+    stroke-linecap="round"/>
+
+  <!-- Core → Window bottom-left (blue) -->
+  <line x1="231" y1="269" x2="143" y2="321"
+    stroke="#3b82f6" stroke-width="2" stroke-opacity="0.45"
+    stroke-linecap="round"/>
+
+  <!-- Core → Window bottom-right (emerald) -->
+  <line x1="281" y1="269" x2="369" y2="321"
+    stroke="#10b981" stroke-width="2" stroke-opacity="0.45"
+    stroke-linecap="round"/>
+
+  <!-- ─── WINDOW 1 — Violet  ·  top  (270° on orbit) ──────────────────────── -->
+  <!--     center: (256, 126)  rect anchor: (212, 93)  size: 88×66            -->
+  <rect x="212" y="93" width="88" height="66" rx="12" fill="url(#wViolet)"/>
+  <!-- border -->
+  <rect x="212" y="93" width="88" height="66" rx="12"
+    fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-opacity="0.55"/>
+  <!-- macOS chrome dots -->
+  <circle cx="227" cy="107" r="4.5" fill="#ff5f57"/>
+  <circle cx="241" cy="107" r="4.5" fill="#febc2e"/>
+  <circle cx="255" cy="107" r="4.5" fill="#28c840"/>
+  <!-- page content bars -->
+  <rect x="225" y="120" width="65" height="5" rx="2.5" fill="white" fill-opacity="0.28"/>
+  <rect x="225" y="130" width="48" height="5" rx="2.5" fill="white" fill-opacity="0.18"/>
+  <rect x="225" y="140" width="56" height="5" rx="2.5" fill="white" fill-opacity="0.11"/>
+
+  <!-- ─── WINDOW 2 — Blue  ·  bottom-left  (150° on orbit) ────────────────── -->
+  <!--     center: (143, 321)  rect anchor: (99, 288)  size: 88×66            -->
+  <rect x="99" y="288" width="88" height="66" rx="12" fill="url(#wBlue)"/>
+  <rect x="99" y="288" width="88" height="66" rx="12"
+    fill="none" stroke="#60a5fa" stroke-width="1.5" stroke-opacity="0.55"/>
+  <circle cx="114" cy="302" r="4.5" fill="#ff5f57"/>
+  <circle cx="128" cy="302" r="4.5" fill="#febc2e"/>
+  <circle cx="142" cy="302" r="4.5" fill="#28c840"/>
+  <rect x="112" y="315" width="65" height="5" rx="2.5" fill="white" fill-opacity="0.28"/>
+  <rect x="112" y="325" width="48" height="5" rx="2.5" fill="white" fill-opacity="0.18"/>
+  <rect x="112" y="335" width="56" height="5" rx="2.5" fill="white" fill-opacity="0.11"/>
+
+  <!-- ─── WINDOW 3 — Emerald  ·  bottom-right  (30° on orbit) ─────────────── -->
+  <!--     center: (369, 321)  rect anchor: (325, 288)  size: 88×66           -->
+  <rect x="325" y="288" width="88" height="66" rx="12" fill="url(#wEmerald)"/>
+  <rect x="325" y="288" width="88" height="66" rx="12"
+    fill="none" stroke="#34d399" stroke-width="1.5" stroke-opacity="0.55"/>
+  <circle cx="340" cy="302" r="4.5" fill="#ff5f57"/>
+  <circle cx="354" cy="302" r="4.5" fill="#febc2e"/>
+  <circle cx="368" cy="302" r="4.5" fill="#28c840"/>
+  <rect x="338" y="315" width="65" height="5" rx="2.5" fill="white" fill-opacity="0.28"/>
+  <rect x="338" y="325" width="48" height="5" rx="2.5" fill="white" fill-opacity="0.18"/>
+  <rect x="338" y="335" width="56" height="5" rx="2.5" fill="white" fill-opacity="0.11"/>
+
+  <!-- ─── Central orb ──────────────────────────────────────────────────────── -->
+  <!-- Ambient glow (wide, very low opacity) -->
+  <circle cx="256" cy="256" r="64" fill="url(#glowGrad)"/>
+  <!-- Soft halo -->
+  <circle cx="256" cy="256" r="42" fill="#7c3aed" fill-opacity="0.18"/>
+  <!-- Main sphere -->
+  <circle cx="256" cy="256" r="30" fill="url(#orbGrad)"/>
+  <!-- Specular highlight (off-center, suggests 3D) -->
+  <ellipse cx="248" cy="248" rx="10" ry="8" fill="white" fill-opacity="0.38"/>
+  <!-- Bright core point -->
+  <circle cx="256" cy="256" r="6" fill="white" fill-opacity="0.92"/>
+
+</svg>
