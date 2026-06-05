@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 /**
  * AppIcon — Ícono de app con soporte de favicon automático.
- * iconType: 'favicon' | 'initials' | 'emoji'
+ * iconType: 'favicon' | 'initials' | 'emoji' | 'customImage'
  * Si iconType es 'favicon', usa Google Favicon Service con fallback a iniciales.
  */
 export default function AppIcon({
@@ -30,6 +30,23 @@ export default function AppIcon({
   }, [url, iconValue, size]);
 
   useEffect(() => { setFaviconOk(true); }, [faviconUrl]);
+
+  if (iconType === 'customImage' && iconValue) {
+    return (
+      <div
+        className={`flex items-center justify-center overflow-hidden bg-white/[0.06] ${className}`}
+        style={containerStyle}
+        title={name}
+      >
+        <img
+          src={iconValue}
+          alt={name}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          draggable={false}
+        />
+      </div>
+    );
+  }
 
   // ── Favicon ────────────────────────────────────────────────────────────────
   if (iconType === 'favicon' && faviconUrl && faviconOk) {

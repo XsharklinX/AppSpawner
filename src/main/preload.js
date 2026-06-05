@@ -15,7 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getApps:      ()                  => invoke('apps:get-all'),
   installApp:   (config)            => invoke('apps:install', config),
   uninstallApp: (id)                => invoke('apps:uninstall', id),
-  launchApp:    (id)                => invoke('apps:launch', id),
+  launchApp:    (id, options)       => invoke('apps:launch', id, options),
   updateApp:    (id, updates)       => invoke('apps:update', id, updates),
   togglePin:    (id)                => invoke('apps:toggle-pin', id),
 
@@ -30,9 +30,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ── SISTEMA ───────────────────────────────────────────────────────────────
   getDefaultInstallPath: () => invoke('system:get-install-path'),
   selectDirectory:       () => invoke('system:select-directory'),
+  selectImage:           () => invoke('system:select-image'),
   getPlatform:           () => invoke('system:get-platform'),
   getVersion:            () => invoke('system:get-version'),
   isDev:                 () => invoke('system:is-dev'),
+  getPortableInfo:       () => invoke('system:get-portable-info'),
+  checkForUpdates:       () => invoke('updates:check'),
+  setSecurityPin:        (pin) => invoke('security:set-pin', pin),
+  clearSecurityPin:      (pin) => invoke('security:clear-pin', pin),
+  verifySecurityPin:     (pin) => invoke('security:verify-pin', pin),
 
   // ── SHELL ─────────────────────────────────────────────────────────────────
   openExternal: (url) => invoke('shell:open-external', url),
@@ -40,6 +46,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ── SHORTCUTS ─────────────────────────────────────────────────────────────
   createShortcuts: (appId) => invoke('shortcuts:create', appId),
   removeShortcuts: (appId) => invoke('shortcuts:remove', appId),
+  repairShortcuts: ()      => invoke('shortcuts:repair-all'),
 
   // ── ALMACENAMIENTO ────────────────────────────────────────────────────────
   getStorageInfo: ()      => invoke('storage:get-info'),
@@ -134,6 +141,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ── AD BLOCK ──────────────────────────────────────────────────────────────
   getAdBlockConfig:       ()              => invoke('adblock:get-config'),
   updateAdBlockConfig:    (updates)       => invoke('adblock:update-config', updates),
+  getAdBlockSubscriptions: ()             => invoke('adblock:get-subscriptions'),
+  updateAdBlockSubscriptions: (items)     => invoke('adblock:update-subscriptions', items),
+  setAdBlockSubscriptions: (items)        => invoke('adblock:set-subscriptions', items),
   getAppAdBlockConfig:    (appId)         => invoke('adblock:get-app-config', appId),
   updateAppAdBlockConfig: (appId, cfg)    => invoke('adblock:update-app-config', appId, cfg),
   getAdBlockCount:        (appId)         => invoke('adblock:get-blocked-count', appId),
@@ -142,6 +152,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ── DATOS ─────────────────────────────────────────────────────────────────
   exportData: ()        => invoke('data:export'),
   importData: (jsonStr) => invoke('data:import', jsonStr),
+  exportBackupFile: ()  => invoke('data:export-file'),
+  importBackupFile: (options) => invoke('data:import-file', options),
+  importFullBackup: (jsonStr, options) => invoke('data:import-full', jsonStr, options),
+  listBackups: () => invoke('backups:list'),
+  runBackupNow: () => invoke('backups:run-now'),
+  runDiagnostics: () => invoke('diagnostics:run'),
 
   // ── FLAGS ─────────────────────────────────────────────────────────────────
   isElectron: true,

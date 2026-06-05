@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RefreshCw, Cpu, Download, Upload, CheckCircle2, AlertCircle, ArrowUpCircle } from 'lucide-react';
+import { RefreshCw, Cpu, Download, Upload, CheckCircle2, AlertCircle, ArrowUpCircle, Mail, UserRound } from 'lucide-react';
 import { useApps } from '../../contexts/AppContext';
 import { useI18n }  from '../../contexts/I18nContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -123,6 +123,10 @@ export default function About() {
         <div className="divider mx-4" />
         <InfoRow label={t('about_build')}   value={APP_BUILD}  />
         <div className="divider mx-4" />
+        <InfoRow label="Desarrollador" value="Sharklin" />
+        <div className="divider mx-4" />
+        <InfoRow label="Contacto" value="contactosharklin@gmail.com" />
+        <div className="divider mx-4" />
         <InfoRow label={t('about_platform')} value={
           platform === 'win32'  ? 'Windows' :
           platform === 'darwin' ? 'macOS'   :
@@ -148,6 +152,23 @@ export default function About() {
 
       {/* ── Descripción ──────────────────────────────────────────────────── */}
       <p className="text-sm text-white/35 leading-relaxed">{t('about_desc')}</p>
+
+      <div className="grid grid-cols-2 gap-2">
+        <a href="mailto:contactosharklin@gmail.com" className="glass rounded-xl px-3.5 py-2.5 flex items-center gap-2 hover:border-violet-500/25 transition-colors">
+          <Mail size={13} className="text-violet-400 flex-shrink-0" />
+          <div className="min-w-0">
+            <p className="text-[10px] text-white/30">Quejas y mejoras</p>
+            <p className="text-xs font-medium text-white/70 truncate">contactosharklin@gmail.com</p>
+          </div>
+        </a>
+        <div className="glass rounded-xl px-3.5 py-2.5 flex items-center gap-2">
+          <UserRound size={13} className="text-violet-400 flex-shrink-0" />
+          <div>
+            <p className="text-[10px] text-white/30">Desarrollador</p>
+            <p className="text-xs font-medium text-white/70">Sharklin</p>
+          </div>
+        </div>
+      </div>
 
       {/* ── Buscar actualizaciones ───────────────────────────────────────── */}
       <div className="flex flex-col gap-3">

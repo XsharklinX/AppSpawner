@@ -1,9 +1,16 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Download, CheckCircle2, Sparkles } from 'lucide-react';
+import { Search, Download, CheckCircle2, Sparkles, Clapperboard, BrainCircuit, BriefcaseBusiness, Code2, Layers3 } from 'lucide-react';
 import AppIcon           from '../components/common/AppIcon';
 import { useApps }        from '../contexts/AppContext';
 import { useI18n }        from '../contexts/I18nContext';
-import { DISCOVER_APPS, CATEGORIES } from '../lib/constants';
+import { DISCOVER_APPS, CATEGORIES, APP_TEMPLATES, TEMPLATE_BY_CATEGORY } from '../lib/constants';
+
+const TEMPLATE_ICONS = {
+  streaming: Clapperboard,
+  ia: BrainCircuit,
+  productividad: BriefcaseBusiness,
+  desarrollo: Code2,
+};
 
 export default function Discover({ onNavigate }) {
   const { apps, installApp } = useApps();
@@ -11,6 +18,7 @@ export default function Discover({ onNavigate }) {
   const [searchQuery,  setSearchQuery]  = useState('');
   const [installing,   setInstalling]   = useState({}); // { catalogId: bool }
   const [filterCat,    setFilterCat]    = useState('all');
+  const [selectedTemplate, setSelectedTemplate] = useState('all');
 
   // Detectar apps ya instaladas por URL
   const installedUrls = useMemo(
@@ -25,12 +33,14 @@ export default function Discover({ onNavigate }) {
   const filteredApps = useMemo(() => {
     const q = searchQuery.toLowerCase();
     return DISCOVER_APPS.filter(app => {
+      const templateId    = TEMPLATE_BY_CATEGORY[app.category] || null;
+      const matchesTemplate = selectedTemplate === 'all' || templateId === selectedTemplate;
       const matchesCat    = filterCat === 'all' || app.category === filterCat;
       const desc          = language === 'en' ? (app.description_en || '') : (app.description_es || '');
       const matchesSearch = !q || app.name.toLowerCase().includes(q) || desc.toLowerCase().includes(q);
-      return matchesCat && matchesSearch;
+      return matchesTemplate && matchesCat && matchesSearch;
     });
-  }, [searchQuery, filterCat, language]);
+  }, [searchQuery, filterCat, selectedTemplate, language]);
 
   const featuredApps = DISCOVER_APPS.filter(a => a.featured);
 
@@ -39,6 +49,7 @@ export default function Discover({ onNavigate }) {
     setInstalling(prev => ({ ...prev, [catalogApp.id]: true }));
     try {
       await installApp({
+        ...(APP_TEMPLATES.find(tpl => tpl.id === (catalogApp.template || TEMPLATE_BY_CATEGORY[catalogApp.category]))?.config || {}),
         name:       catalogApp.name,
         url:        catalogApp.url,
         category:   catalogApp.category,
@@ -79,7 +90,10 @@ export default function Discover({ onNavigate }) {
           {[{ id: 'all', label_es: 'Todas', label_en: 'All' }, ...CATEGORIES.slice(1)].map(cat => (
             <button
               key={cat.id}
-              onClick={() => setFilterCat(cat.id)}
+              onClick={() => {
+                setFilterCat(cat.id);
+                if (cat.id === 'all') setSelectedTemplate('all');
+              }}
               className={`
                 flex-shrink-0 text-xs font-medium px-3.5 py-1.5 rounded-full transition-all duration-150
                 ${filterCat === cat.id
@@ -92,13 +106,51 @@ export default function Discover({ onNavigate }) {
             </button>
           ))}
         </div>
+
+        <div className="mt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Layers3 size={14} className="text-violet-300" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-white/45">Plantillas de instalacion</span>
+          </div>
+          <div className="grid sm:grid-cols-2 xl:grid-cols-5 gap-3">
+            {[{ id: 'all', label_es: 'Todas', label_en: 'All', description_es: 'Directorio completo sin preset activo.', description_en: 'Full directory without an active preset.', accent: '#8b5cf6' }, ...APP_TEMPLATES].map(template => {
+              const Icon = TEMPLATE_ICONS[template.id] || Layers3;
+              const active = selectedTemplate === template.id;
+              return (
+                <button
+                  key={template.id}
+                  onClick={() => {
+                    setSelectedTemplate(template.id);
+                    setFilterCat(template.category || 'all');
+                  }}
+                  className={`rounded-2xl border p-3 text-left transition-all min-h-[110px] ${
+                    active
+                      ? 'bg-violet-600/16 border-violet-500/35 shadow-card'
+                      : 'bg-white/[0.025] border-white/[0.06] hover:bg-white/[0.045] hover:border-white/[0.1]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${template.accent}22`, color: template.accent }}>
+                      <Icon size={16} />
+                    </div>
+                    {active && <CheckCircle2 size={15} className="text-violet-300" />}
+                  </div>
+                  <p className="text-sm font-semibold text-white/82 mt-3">{language === 'en' ? template.label_en : template.label_es}</p>
+                  <p className="text-[11px] text-white/38 mt-1 leading-relaxed line-clamp-2">
+                    {language === 'en' ? template.description_en : template.description_es}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* ── Contenido ─────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto scrollbar-thin px-7 pb-6">
 
         {/* Apps Destacadas (solo si no hay filtro de búsqueda/categoría) */}
-        {!searchQuery && filterCat === 'all' && (
+        {!searchQuery && filterCat === 'all' && selectedTemplate === 'all' && (
           <section className="mb-7">
             <div className="flex items-center gap-2 mb-3">
               <Sparkles size={14} className="text-amber-400" />
@@ -126,7 +178,7 @@ export default function Discover({ onNavigate }) {
         {/* Todas las apps */}
         {filteredApps.length > 0 ? (
           <section>
-            {(!searchQuery && filterCat === 'all') && (
+            {(!searchQuery && filterCat === 'all' && selectedTemplate === 'all') && (
               <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-3">
                 {t('disc_all')}
               </h2>

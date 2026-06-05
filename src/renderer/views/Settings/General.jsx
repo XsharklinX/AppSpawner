@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FolderOpen, Check, Info } from 'lucide-react';
+import { FolderOpen, Check, Info, RefreshCw, PlayCircle } from 'lucide-react';
 import Switch     from '../../components/common/Switch';
 import { useI18n }  from '../../contexts/I18nContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -15,6 +15,7 @@ export default function General() {
     installPath:         '',
   });
   const [saved, setSaved] = useState(false);
+  const [repairingShortcuts, setRepairingShortcuts] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -42,6 +43,26 @@ export default function General() {
   const browsePath = async () => {
     const selectedPath = await window.electronAPI?.selectDirectory();
     if (selectedPath) save({ installPath: selectedPath });
+  };
+
+  const repairShortcuts = async () => {
+    setRepairingShortcuts(true);
+    try {
+      const result = await window.electronAPI?.repairShortcuts();
+      if (result?.success === false) {
+        toast.error('Algunos accesos no se pudieron reparar', `${result.repaired || 0} apps procesadas`);
+      } else {
+        toast.success('Accesos directos reparados', `${result?.repaired || 0} apps procesadas`);
+      }
+    } catch (err) {
+      toast.error(t('error'), err.message);
+    } finally {
+      setRepairingShortcuts(false);
+    }
+  };
+
+  const showOnboarding = () => {
+    window.dispatchEvent(new CustomEvent('appspawner:show-onboarding'));
   };
 
   return (
@@ -116,6 +137,36 @@ export default function General() {
       </Section>
 
       {/* ── Inicio automático ─────────────────────────────────────────────── */}
+      <Section title="Mantenimiento">
+        <div className="glass rounded-xl p-4 flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-white/75">Reparar accesos directos</p>
+              <p className="text-xs text-white/35 mt-0.5">Regenera accesos con iconos, rutas y nombres actuales.</p>
+            </div>
+            <button
+              onClick={repairShortcuts}
+              disabled={repairingShortcuts}
+              className="btn-ghost flex items-center gap-2 text-xs flex-shrink-0 disabled:opacity-50"
+            >
+              <RefreshCw size={13} className={repairingShortcuts ? 'animate-spin' : ''} />
+              Reparar
+            </button>
+          </div>
+          <div className="divider" />
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-white/75">Ver presentación inicial</p>
+              <p className="text-xs text-white/35 mt-0.5">Reabre el tour de AppSpawner sin cambiar tus datos.</p>
+            </div>
+            <button onClick={showOnboarding} className="btn-ghost flex items-center gap-2 text-xs flex-shrink-0">
+              <PlayCircle size={13} />
+              Ver tour
+            </button>
+          </div>
+        </div>
+      </Section>
+
       <Section title="Sistema">
         <div className="glass rounded-xl p-4">
           <Switch

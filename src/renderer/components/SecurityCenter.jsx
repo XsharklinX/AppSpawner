@@ -16,7 +16,7 @@ function PasswordsTab({ app }) {
   const [creds,   setCreds]   = useState([]);
   const [adding,  setAdding]  = useState(false);
   const [filling, setFilling] = useState(null);
-  const [form,    setForm]    = useState({ name: '', username: '', password: '' });
+  const [form,    setForm]    = useState({ name: '', username: '', password: '', selectors: { username: '', password: '', submit: '' } });
   const [showPwd, setShowPwd] = useState(false);
   const [msg,     setMsg]     = useState(null);
 
@@ -34,9 +34,10 @@ function PasswordsTab({ app }) {
       username: form.username.trim(),
       password: form.password,
       url: app.url,
+      selectors: form.selectors,
     });
     if (result?.success) {
-      setForm({ name: '', username: '', password: '' });
+      setForm({ name: '', username: '', password: '', selectors: { username: '', password: '', submit: '' } });
       setAdding(false);
       await load();
       toast.success('Credencial guardada');
@@ -111,6 +112,30 @@ function PasswordsTab({ app }) {
             <button onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
               {showPwd ? <EyeOff size={13} /> : <Eye size={13} />}
             </button>
+          </div>
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 flex flex-col gap-2">
+            <p className="text-[11px] text-white/35 font-semibold uppercase tracking-wider">Selectors avanzados opcionales</p>
+            <input
+              type="text"
+              value={form.selectors.username}
+              onChange={e => setForm(f => ({ ...f, selectors: { ...f.selectors, username: e.target.value } }))}
+              placeholder="Selector usuario: input[name='email']"
+              className="input-field text-xs font-mono py-2"
+            />
+            <input
+              type="text"
+              value={form.selectors.password}
+              onChange={e => setForm(f => ({ ...f, selectors: { ...f.selectors, password: e.target.value } }))}
+              placeholder="Selector password: input[type='password']"
+              className="input-field text-xs font-mono py-2"
+            />
+            <input
+              type="text"
+              value={form.selectors.submit}
+              onChange={e => setForm(f => ({ ...f, selectors: { ...f.selectors, submit: e.target.value } }))}
+              placeholder="Selector submit opcional: button[type='submit']"
+              className="input-field text-xs font-mono py-2"
+            />
           </div>
           <div className="flex gap-2">
             <button onClick={handleAdd} disabled={!form.username || !form.password} className="btn-primary text-sm flex-1 flex items-center justify-center gap-2 disabled:opacity-40">
@@ -255,14 +280,13 @@ function OTPTab({ app }) {
             <input
               type="text"
               value={form.secret}
-              onChange={e => setForm(f=>({...f,secret:e.target.value.replace(/\s/g,'').toUpperCase()}))}
-              placeholder="Secreto TOTP (Base32)"
+              onChange={e => setForm(f=>({...f,secret:e.target.value}))}
+              placeholder="Secreto Base32 u otpauth:// del QR"
               className="input-field text-sm font-mono tracking-wider"
               autoComplete="off"
             />
             <p className="text-[11px] text-white/25 mt-1 leading-relaxed">
-              Copia el secreto Base32 desde la configuración 2FA de la web
-              (normalmente está al lado del código QR, "¿No puedes escanear?").
+              Puedes pegar el secreto Base32 o la URL otpauth:// que contiene un QR 2FA exportado por otro gestor.
             </p>
           </div>
           <div className="flex gap-2">

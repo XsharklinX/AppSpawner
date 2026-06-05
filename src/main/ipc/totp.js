@@ -44,6 +44,26 @@ function timeRemaining(timeStep = 30) {
   return timeStep - (Math.floor(Date.now() / 1000) % timeStep);
 }
 
+function parseTotpInput({ name, issuer, secret }) {
+  const raw = String(secret || '').trim();
+  if (/^otpauth:\/\//i.test(raw)) {
+    const parsed = new URL(raw);
+    const params = parsed.searchParams;
+    const label = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
+    const [labelIssuer, labelName] = label.includes(':') ? label.split(/:(.+)/) : ['', label];
+    return {
+      name: String(name || labelName || label || '').trim(),
+      issuer: String(issuer || params.get('issuer') || labelIssuer || '').trim(),
+      secret: String(params.get('secret') || '').replace(/\s/g, '').toUpperCase(),
+    };
+  }
+  return {
+    name: String(name || '').trim(),
+    issuer: String(issuer || '').trim(),
+    secret: raw.replace(/\s/g, '').toUpperCase(),
+  };
+}
+
 // ── Encrypt / decrypt seed ────────────────────────────────────────────────────
 
 function encSeed(s) {
@@ -73,7 +93,8 @@ function registerTotpHandlers(ipcMain) {
 
   ipcMain.handle('totp:add', (_e, appId, { name, issuer, secret }) => {
     try {
-      const clean = secret.replace(/\s/g, '').toUpperCase();
+      const parsed = parseTotpInput({ name, issuer, secret });
+      const clean = parsed.secret;
       // Validate — will throw if secret is invalid
       computeTotp(clean);
 
@@ -82,8 +103,8 @@ function registerTotpHandlers(ipcMain) {
       const entries = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf-8')) : [];
       const entry   = {
         id:        crypto.randomUUID(),
-        name:      String(name   || '').trim().slice(0, 60),
-        issuer:    String(issuer || '').trim().slice(0, 60),
+        name:      String(parsed.name || parsed.issuer || '2FA').trim().slice(0, 60),
+        issuer:    String(parsed.issuer || '').trim().slice(0, 60),
         seed:      encSeed(clean),
         createdAt: Date.now(),
       };

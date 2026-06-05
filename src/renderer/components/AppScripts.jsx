@@ -15,6 +15,7 @@ export default function AppScripts({ app }) {
   const [css,     setCss]     = useState('');
   const [js,      setJs]      = useState('');
   const [enabled, setEnabled] = useState(true);
+  const [permissions, setPermissions] = useState({ css: true, dom: true, network: false, storage: false });
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
   const [saved,   setSaved]   = useState(false);
@@ -27,6 +28,7 @@ export default function AppScripts({ app }) {
         setCss(scripts.css || '');
         setJs(scripts.js  || '');
         setEnabled(scripts.enabled !== false);
+        setPermissions({ css: true, dom: true, network: false, storage: false, ...(scripts.permissions || {}) });
       } finally {
         setLoading(false);
       }
@@ -38,7 +40,7 @@ export default function AppScripts({ app }) {
     setSaving(true);
     setSaved(false);
     try {
-      await window.electronAPI?.saveScripts(app.id, { css, js, enabled });
+      await window.electronAPI?.saveScripts(app.id, { css, js, enabled, permissions });
       setSaved(true);
       toast.success('Scripts guardados', 'Se aplicarán en la próxima recarga');
       setTimeout(() => setSaved(false), 3000);
@@ -51,7 +53,7 @@ export default function AppScripts({ app }) {
 
   const handleDelete = async () => {
     await window.electronAPI?.deleteScripts(app.id);
-    setCss(''); setJs(''); setEnabled(true);
+    setCss(''); setJs(''); setEnabled(true); setPermissions({ css: true, dom: true, network: false, storage: false });
     toast.success('Scripts eliminados');
   };
 
@@ -86,6 +88,31 @@ export default function AppScripts({ app }) {
       </label>
 
       {/* Tabs CSS / JS */}
+      <div className="glass rounded-xl p-3">
+        <p className="text-[11px] font-semibold text-white/35 uppercase tracking-wider mb-2">Permisos del script</p>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            ['css', 'Inyectar CSS'],
+            ['dom', 'Ejecutar JS en DOM'],
+            ['network', 'Permiso de red declarado'],
+            ['storage', 'Permiso de storage declarado'],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setPermissions(prev => ({ ...prev, [key]: !prev[key] }))}
+              className={`rounded-lg border px-3 py-2 text-left text-xs transition-all ${
+                permissions[key]
+                  ? 'bg-violet-600/18 border-violet-500/35 text-violet-200'
+                  : 'bg-white/[0.025] border-white/[0.07] text-white/35 hover:text-white/60'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tabs CSS / JS */}
       <div className="flex gap-1 p-1 glass rounded-xl">
         {['css', 'js'].map(t => (
           <button
@@ -105,7 +132,7 @@ export default function AppScripts({ app }) {
           onChange={e => setCss(e.target.value)}
           placeholder={PLACEHOLDER_CSS}
           className="input-field font-mono text-xs resize-none leading-relaxed"
-          rows={10}
+          rows={14}
           spellCheck={false}
         />
       ) : (
@@ -114,7 +141,7 @@ export default function AppScripts({ app }) {
           onChange={e => setJs(e.target.value)}
           placeholder={PLACEHOLDER_JS}
           className="input-field font-mono text-xs resize-none leading-relaxed"
-          rows={10}
+          rows={14}
           spellCheck={false}
         />
       )}

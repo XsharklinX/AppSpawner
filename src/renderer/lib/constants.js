@@ -13,6 +13,120 @@ export const CATEGORIES = [
   { id: 'general',        label_es: 'General',         label_en: 'General' },
 ];
 
+export const APP_TEMPLATES = [
+  {
+    id: 'streaming',
+    label_es: 'Streaming',
+    label_en: 'Streaming',
+    category: 'entretenimiento',
+    accent: '#8b5cf6',
+    description_es: 'Video, musica y entretenimiento con PiP, controles y bloqueo agresivo de anuncios.',
+    description_en: 'Video, music and entertainment with PiP, controls and aggressive ad blocking.',
+    config: {
+      openMode: 'normal',
+      adblockEnabled: true,
+      toolbar: {
+        enabled: true,
+        buttons: ['back', 'forward', 'reload', 'home', 'pip', 'notes'],
+      },
+      shortcuts: {
+        enabled: true,
+        bindings: {
+          reload: 'Ctrl+R',
+          home: 'Alt+Home',
+          pip: 'Ctrl+Shift+P',
+        },
+      },
+      windowConfig: { width: 1320, height: 820 },
+    },
+  },
+  {
+    id: 'ia',
+    label_es: 'IA',
+    label_en: 'AI',
+    category: 'ia',
+    accent: '#10b981',
+    description_es: 'Asistentes de IA con notas, home rapido, scripts y entorno enfocado.',
+    description_en: 'AI assistants with notes, quick home, scripts and a focused workspace.',
+    config: {
+      openMode: 'normal',
+      adblockEnabled: true,
+      toolbar: {
+        enabled: true,
+        buttons: ['back', 'forward', 'reload', 'home', 'notes'],
+      },
+      shortcuts: {
+        enabled: true,
+        bindings: {
+          reload: 'Ctrl+R',
+          home: 'Alt+Home',
+          notes: 'Ctrl+Shift+N',
+        },
+      },
+      windowConfig: { width: 1240, height: 820 },
+    },
+  },
+  {
+    id: 'productividad',
+    label_es: 'Productividad',
+    label_en: 'Productivity',
+    category: 'trabajo',
+    accent: '#06b6d4',
+    description_es: 'Trabajo diario con notas, navegacion limpia y sesiones persistentes.',
+    description_en: 'Daily work with notes, clean navigation and persistent sessions.',
+    config: {
+      openMode: 'normal',
+      adblockEnabled: true,
+      toolbar: {
+        enabled: true,
+        buttons: ['back', 'forward', 'reload', 'home', 'notes'],
+      },
+      shortcuts: {
+        enabled: true,
+        bindings: {
+          reload: 'Ctrl+R',
+          home: 'Alt+Home',
+        },
+      },
+      windowConfig: { width: 1280, height: 840 },
+    },
+  },
+  {
+    id: 'desarrollo',
+    label_es: 'Desarrollo',
+    label_en: 'Development',
+    category: 'desarrollo',
+    accent: '#f97316',
+    description_es: 'Herramientas tecnicas con DevTools, recarga rapida y notas por app.',
+    description_en: 'Technical tools with DevTools, quick reload and per-app notes.',
+    config: {
+      openMode: 'normal',
+      adblockEnabled: true,
+      toolbar: {
+        enabled: true,
+        buttons: ['back', 'forward', 'reload', 'home', 'devtools', 'notes'],
+      },
+      shortcuts: {
+        enabled: true,
+        bindings: {
+          reload: 'Ctrl+R',
+          home: 'Alt+Home',
+          devtools: 'Ctrl+Shift+I',
+          notes: 'Ctrl+Shift+N',
+        },
+      },
+      windowConfig: { width: 1360, height: 860 },
+    },
+  },
+];
+
+export const TEMPLATE_BY_CATEGORY = {
+  entretenimiento: 'streaming',
+  ia: 'ia',
+  trabajo: 'productividad',
+  desarrollo: 'desarrollo',
+};
+
 // Shorthand para no repetir iconType:'favicon' en cada entrada
 const fav = (id, name, url, category, iconColor, description_es, description_en, featured = false, rating = 4.2) =>
   ({ id, name, url, category, iconType: 'favicon', iconColor, description_es, description_en, featured, rating });
@@ -477,6 +591,6 @@ export const DISCOVER_APPS = [
 ];
 
 /** Versión de la aplicación */
-export const APP_VERSION = '2.4.1';
+export const APP_VERSION = '3.1.0';
 export const APP_NAME    = 'AppSpawner';
 export const APP_BUILD   = 'Premium Build';

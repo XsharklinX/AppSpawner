@@ -42,20 +42,29 @@ function writeCreds(appId, creds) {
 
 // ── Autofill script builder ───────────────────────────────────────────────────
 
-function buildFillScript(username, password) {
+function buildFillScript(username, password, selectors = {}) {
   const esc = s => s.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n');
+  const userSelector = selectors.username ? `'${esc(String(selectors.username).slice(0, 300))}'` : 'null';
+  const passSelector = selectors.password ? `'${esc(String(selectors.password).slice(0, 300))}'` : 'null';
+  const submitSelector = selectors.submit ? `'${esc(String(selectors.submit).slice(0, 300))}'` : 'null';
   return `(function(){
     const sets=(el,val)=>{
       const p=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value');
       if(p)p.set.call(el,val); else el.value=val;
       ['input','change'].forEach(e=>el.dispatchEvent(new Event(e,{bubbles:true})));
     };
+    const visible=el=>!!el&&!el.disabled&&!el.readOnly&&el.offsetParent!==null;
+    const bySel=sel=>{try{return sel?document.querySelector(sel):null}catch{return null}};
     const pw=[...document.querySelectorAll('input[type="password"]')];
-    const us=[...document.querySelectorAll('input[type="email"],input[name*="user"],input[name*="email"],input[autocomplete*="email"],input[autocomplete*="username"],input[type="text"]')]
-              .filter(el=>!el.hidden&&el.offsetParent!==null);
-    if(us.length)sets(us[0],'${esc(username)}');
-    if(pw.length)sets(pw[0],'${esc(password)}');
-    return{filledUser:us.length>0,filledPass:pw.length>0};
+    const us=[...document.querySelectorAll('input[type="email"],input[name*="user" i],input[name*="email" i],input[id*="user" i],input[id*="email" i],input[autocomplete*="email" i],input[autocomplete*="username" i],input[type="text"]')]
+              .filter(visible);
+    const userEl=bySel(${userSelector})||us[0]||null;
+    const passEl=bySel(${passSelector})||pw.find(visible)||pw[0]||null;
+    if(userEl)sets(userEl,'${esc(username)}');
+    if(passEl)sets(passEl,'${esc(password)}');
+    const submitEl=bySel(${submitSelector});
+    if(submitEl)submitEl.click();
+    return{filledUser:!!userEl,filledPass:!!passEl,clickedSubmit:!!submitEl};
   })();`;
 }
 
@@ -79,8 +88,8 @@ function registerCredentialHandlers(ipcMain, appWindows) {
 
   // List all credentials for an app (without passwords)
   ipcMain.handle('credentials:list', (_e, appId) => {
-    return readCreds(appId).map(({ id, name, username, url, createdAt }) =>
-      ({ id, name, username, url, createdAt }));
+    return readCreds(appId).map(({ id, name, username, url, selectors, createdAt }) =>
+      ({ id, name, username, url, selectors: selectors || {}, createdAt }));
   });
 
   // Backward-compat: get first credential summary
@@ -91,7 +100,7 @@ function registerCredentialHandlers(ipcMain, appWindows) {
   });
 
   // Add new credential
-  ipcMain.handle('credentials:add', (_e, appId, { name, username, password, url }) => {
+  ipcMain.handle('credentials:add', (_e, appId, { name, username, password, url, selectors }) => {
     try {
       const creds = readCreds(appId);
       const entry = {
@@ -100,6 +109,11 @@ function registerCredentialHandlers(ipcMain, appWindows) {
         username:  String(username || '').trim(),
         password:  enc(password),
         url:       url || '',
+        selectors: {
+          username: String(selectors?.username || '').trim().slice(0, 300),
+          password: String(selectors?.password || '').trim().slice(0, 300),
+          submit:   String(selectors?.submit   || '').trim().slice(0, 300),
+        },
         createdAt: Date.now(),
       };
       creds.push(entry);
@@ -220,7 +234,7 @@ async function _doAutofill(appWindows, appId, cred) {
   if (!win || win.isDestroyed()) return { success: false, error: 'La app no está abierta. Ábrela primero.' };
   try {
     const password = dec(cred.password);
-    const result   = await win.webContents.executeJavaScript(buildFillScript(cred.username, password));
+    const result   = await win.webContents.executeJavaScript(buildFillScript(cred.username, password, cred.selectors));
     return { success: true, ...result };
   } catch (err) { return { success: false, error: err.message }; }
 }

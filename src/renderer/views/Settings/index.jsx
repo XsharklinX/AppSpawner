@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings2, Palette, Link2, HardDrive, Info, ShieldCheck } from 'lucide-react';
+import { Settings2, Palette, Link2, HardDrive, Info, ShieldCheck, Archive, LockKeyhole } from 'lucide-react';
 import { useI18n } from '../../contexts/I18nContext';
 import General    from './General';
 import Appearance from './Appearance';
@@ -7,13 +7,17 @@ import LinkRules  from './LinkRules';
 import Storage    from './Storage';
 import About      from './About';
 import AdBlock    from './AdBlock';
+import Backup     from './Backup';
+import Security   from './Security';
 
 const TABS = [
   { id: 'general',    icon: Settings2,   key: 'set_general'    },
   { id: 'adblock',    icon: ShieldCheck, key: 'set_adblock'    },
+  { id: 'security',   icon: LockKeyhole, label: 'Seguridad'     },
   { id: 'appearance', icon: Palette,     key: 'set_appearance' },
   { id: 'link_rules', icon: Link2,       key: 'set_link_rules' },
   { id: 'storage',    icon: HardDrive,   key: 'set_storage'    },
+  { id: 'backup',     icon: Archive,     label: 'Backup'       },
   { id: 'about',      icon: Info,        key: 'set_about'      },
 ];
 
@@ -25,9 +29,11 @@ export default function Settings() {
     switch (activeTab) {
       case 'general':    return <General />;
       case 'adblock':    return <AdBlock />;
+      case 'security':   return <Security />;
       case 'appearance': return <Appearance />;
       case 'link_rules': return <LinkRules />;
       case 'storage':    return <Storage />;
+      case 'backup':     return <Backup />;
       case 'about':      return <About />;
       default:           return <General />;
     }
@@ -58,7 +64,7 @@ export default function Settings() {
               `}
             >
               <Icon size={15} className={active ? 'text-violet-400' : 'text-white/25'} />
-              {t(tab.key)}
+              {tab.label || t(tab.key)}
             </button>
           );
         })}
@@ -66,7 +72,7 @@ export default function Settings() {
 
       {/* ── Contenido del tab activo ──────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto scrollbar-thin px-8 py-6">
-        <div className="max-w-xl animate-fade-in" key={activeTab}>
+        <div className="max-w-3xl animate-fade-in" key={activeTab}>
           {renderTab()}
         </div>
       </div>

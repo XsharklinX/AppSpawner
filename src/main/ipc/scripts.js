@@ -28,6 +28,12 @@ function registerScriptHandlers(ipcMain) {
         css:     String(scripts.css     || '').slice(0, 100_000),
         js:      String(scripts.js      || '').slice(0, 100_000),
         enabled: scripts.enabled !== false,
+        permissions: {
+          css: scripts.permissions?.css !== false,
+          dom: scripts.permissions?.dom !== false,
+          network: scripts.permissions?.network === true,
+          storage: scripts.permissions?.storage === true,
+        },
       }));
       return { success: true };
     } catch (err) {

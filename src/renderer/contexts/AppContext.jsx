@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef, useState } from 'react';
 import { useToast } from './ToastContext';
 import { useI18n }  from './I18nContext';
 
@@ -41,6 +41,9 @@ export function AppProvider({ children }) {
   const toast      = useToast();
   const { t }      = useI18n();
   const loadingRef = useRef(false);
+  const pinResolverRef = useRef(null);
+  const [pinDialog, setPinDialog] = useState(null);
+  const [pinInput, setPinInput] = useState('');
 
   useEffect(() => { loadApps(); }, []);
 
@@ -54,6 +57,19 @@ export function AppProvider({ children }) {
       dispatch({ type: 'UPDATE_BADGE', appId: data.appId, count: data.count })
     );
     return () => unsub?.();
+  }, []);
+
+  const requestPin = useCallback((appName) => new Promise(resolve => {
+    pinResolverRef.current = resolve;
+    setPinInput('');
+    setPinDialog({ appName });
+  }), []);
+
+  const closePinDialog = useCallback((value = null) => {
+    pinResolverRef.current?.(value);
+    pinResolverRef.current = null;
+    setPinDialog(null);
+    setPinInput('');
   }, []);
 
   const loadApps = useCallback(async () => {
@@ -74,7 +90,13 @@ export function AppProvider({ children }) {
       newApp = await window.electronAPI?.installApp(config);
       if (!newApp) throw new Error('Sin respuesta del backend');
       dispatch({ type: 'ADD_APP', app: newApp });
-      if (createShortcuts) window.electronAPI?.createShortcuts(newApp.id).catch(() => {});
+      if (createShortcuts) {
+        const shortcutResult = await window.electronAPI?.createShortcuts(newApp.id);
+        const failedShortcut = Object.values(shortcutResult?.results || {}).find(result => result?.success === false);
+        if (shortcutResult?.success === false || failedShortcut) {
+          toast.error('No se pudo crear el acceso directo', shortcutResult?.error || failedShortcut?.error || newApp.name);
+        }
+      }
       window.electronAPI?.refreshTray?.();
       toast.success(`"${newApp.name}" ${t('toast_installed')}`, t('success'));
       return newApp;
@@ -105,6 +127,9 @@ export function AppProvider({ children }) {
     try {
       const updated = await window.electronAPI?.updateApp(appId, updates);
       dispatch({ type: 'UPDATE_APP', id: appId, updates });
+      if (['name', 'url', 'iconType', 'iconValue', 'iconColor'].some(key => Object.hasOwn(updates, key))) {
+        window.electronAPI?.createShortcuts(appId).catch(() => {});
+      }
       toast.success(t('toast_updated'), updated?.name ?? '');
       return updated;
     } catch (err) { toast.error(t('error'), err.message); throw err; }
@@ -112,13 +137,23 @@ export function AppProvider({ children }) {
 
   const launchApp = useCallback(async (appId) => {
     try {
-      await window.electronAPI?.launchApp(appId);
+      const app = state.apps.find(a => a.id === appId);
+      let options = {};
+      if (app?.security?.locked) {
+        const pin = await requestPin(app.name);
+        if (!pin) return;
+        options.pin = pin;
+      }
+      const result = await window.electronAPI?.launchApp(appId, options);
+      if (result && result.success === false) {
+        throw new Error(result.error || 'No se pudo abrir la app');
+      }
       dispatch({ type: 'MARK_LAUNCHED', id: appId });
     } catch (err) {
-      toast.error(t('toast_error_launch'), state.apps.find(a => a.id === appId)?.name ?? '');
+      toast.error(err.message || t('toast_error_launch'), state.apps.find(a => a.id === appId)?.name ?? '');
       throw err;
     }
-  }, [state.apps, toast, t]);
+  }, [state.apps, toast, t, requestPin]);
 
   const togglePin = useCallback(async (appId) => {
     try {
@@ -148,6 +183,31 @@ export function AppProvider({ children }) {
       isWindowOpen: (appId)     => state.openWindows.has(appId),
     }}>
       {children}
+      {pinDialog && (
+        <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm glass rounded-2xl border border-white/[0.08] shadow-card-hover p-5">
+            <p className="text-base font-semibold text-white">App protegida</p>
+            <p className="text-sm text-white/40 mt-1">Introduce el PIN para abrir {pinDialog.appName}.</p>
+            <input
+              autoFocus
+              type="password"
+              inputMode="numeric"
+              value={pinInput}
+              onChange={e => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 12))}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && pinInput.length >= 4) closePinDialog(pinInput);
+                if (e.key === 'Escape') closePinDialog(null);
+              }}
+              className="input-field mt-4 text-center text-lg tracking-[0.3em]"
+              placeholder="PIN"
+            />
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => closePinDialog(null)} className="btn-ghost text-sm flex-1">Cancelar</button>
+              <button onClick={() => closePinDialog(pinInput)} disabled={pinInput.length < 4} className="btn-primary text-sm flex-1 disabled:opacity-40">Desbloquear</button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppContext.Provider>
   );
 }

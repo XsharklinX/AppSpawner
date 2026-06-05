@@ -10,7 +10,7 @@ export default function Modal({
   onClose,
   title,
   children,
-  size = 'md', // 'sm' | 'md' | 'lg' | 'xl'
+  size = 'md', // 'sm' | 'md' | 'lg' | 'xl' | '2xl'
   showCloseButton = true,
 }) {
   const overlayRef = useRef(null);
@@ -21,6 +21,7 @@ export default function Modal({
     md: 'max-w-lg',
     lg: 'max-w-2xl',
     xl: 'max-w-4xl',
+    '2xl': 'max-w-5xl',
   };
 
   // Cierre con Escape
@@ -58,7 +59,7 @@ export default function Modal({
         tabIndex={-1}
         className={`
           relative w-full ${sizeClasses[size] || sizeClasses.md}
-          glass rounded-3xl shadow-card-hover
+          glass rounded-2xl shadow-card-hover max-h-[88vh] overflow-hidden
           animate-scale-in outline-none
         `}
       >
@@ -81,7 +82,7 @@ export default function Modal({
         )}
 
         {/* Body */}
-        <div className="px-6 py-5">
+        <div className="px-6 py-5 overflow-y-auto scrollbar-thin max-h-[calc(88vh-72px)]">
           {children}
         </div>
       </div>

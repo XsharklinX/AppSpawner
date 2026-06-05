@@ -13,8 +13,8 @@ export default function Switch({
   size      = 'md', // 'sm' | 'md'
 }) {
   const sizes = {
-    sm: { track: 'w-8 h-4',   thumb: 'w-3 h-3',   translate: 'translate-x-4' },
-    md: { track: 'w-10 h-5.5', thumb: 'w-4 h-4',   translate: 'translate-x-5' },
+    sm: { track: 'w-9 h-5',  thumb: 'w-4 h-4', translate: 'translate-x-4' },
+    md: { track: 'w-12 h-6', thumb: 'w-5 h-5', translate: 'translate-x-6' },
   };
   const s = sizes[size] || sizes.md;
 
@@ -54,8 +54,8 @@ export default function Switch({
           relative flex-shrink-0 rounded-full transition-all duration-200
           ${s.track}
           ${checked
-            ? 'bg-violet-600 shadow-glow-sm'
-            : 'bg-white/[0.1] border border-white/[0.08]'
+            ? 'bg-violet-600 border border-violet-400/40 shadow-glow-sm'
+            : 'bg-white/[0.08] border border-white/[0.16]'
           }
           focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:ring-offset-2 focus:ring-offset-surface-card
         `}
@@ -63,7 +63,7 @@ export default function Switch({
         {/* Thumb */}
         <div
           className={`
-            absolute top-[3px] left-[3px] rounded-full bg-white shadow-sm
+            absolute top-0.5 left-0.5 rounded-full bg-white shadow-sm
             transition-transform duration-200
             ${s.thumb}
             ${checked ? s.translate : 'translate-x-0'}

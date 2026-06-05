@@ -8,6 +8,7 @@
 const fs   = require('fs');
 const path = require('path');
 const { app, shell } = require('electron');
+const { ensureAppIcon } = require('../icon-utils');
 
 /**
  * Registra los handlers IPC de shortcuts.
@@ -42,6 +43,23 @@ function registerShortcutHandlers(ipcMain, store) {
     await _removeShortcuts(appConfig);
     return { success: true };
   });
+
+  ipcMain.handle('shortcuts:repair-all', async () => {
+    const data = store.read();
+    const results = [];
+    for (const appConfig of data.apps || []) {
+      const appResult = { appId: appConfig.id, name: appConfig.name, results: {} };
+      if (data.settings.desktopShortcuts) {
+        appResult.results.desktop = await _createShortcut(appConfig, 'desktop');
+      }
+      if (data.settings.startMenuShortcuts) {
+        appResult.results.startMenu = await _createShortcut(appConfig, 'startMenu');
+      }
+      results.push(appResult);
+    }
+    const failed = results.flatMap(item => Object.values(item.results)).filter(result => result?.success === false);
+    return { success: failed.length === 0, repaired: results.length, results };
+  });
 }
 
 // ── Dispatcher por plataforma ─────────────────────────────────────────────────
@@ -64,7 +82,7 @@ async function _removeShortcuts(appConfig) {
 
 // ── Windows ───────────────────────────────────────────────────────────────────
 
-function _win32Create(appConfig, type) {
+async function _win32Create(appConfig, type) {
   try {
     const targetDir = type === 'desktop'
       ? app.getPath('desktop')
@@ -79,14 +97,19 @@ function _win32Create(appConfig, type) {
       ? `"${app.getAppPath()}" --launch-app=${appConfig.id}`
       : `--launch-app=${appConfig.id}`;
 
-    const success = shell.writeShortcutLink(shortcutPath, 'create', {
+    const iconPaths = await ensureAppIcon(appConfig);
+    const operation = fs.existsSync(shortcutPath) ? 'replace' : 'create';
+    const success = shell.writeShortcutLink(shortcutPath, operation, {
       target:          process.execPath,
       args,
       description:     `Abrir ${appConfig.name} en AppSpawner`,
+      icon:            iconPaths.ico,
+      iconIndex:       0,
+      workingDirectory: path.dirname(process.execPath),
       appUserModelId:  `com.appspawner.app.${appConfig.id}`,
     });
 
-    return { success, path: shortcutPath };
+    return { success, path: shortcutPath, icon: iconPaths.ico, operation };
   } catch (err) {
     return { success: false, error: err.message };
   }
@@ -102,7 +125,7 @@ function _win32Remove(appConfig) {
 
 // ── macOS ─────────────────────────────────────────────────────────────────────
 
-function _macCreate(appConfig, type) {
+async function _macCreate(appConfig, type) {
   try {
     const targetDir = type === 'desktop'
       ? app.getPath('desktop')
@@ -124,6 +147,9 @@ function _macCreate(appConfig, type) {
     fs.writeFileSync(scriptPath, `#!/bin/bash\nexec ${execCmd} "$@"\n`);
     fs.chmodSync(scriptPath, '755');
 
+    const iconPaths = await ensureAppIcon(appConfig);
+    fs.copyFileSync(iconPaths.png, path.join(resPath, 'icon.png'));
+
     // Info.plist mínimo
     const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -133,13 +159,14 @@ function _macCreate(appConfig, type) {
   <key>CFBundleDisplayName</key><string>${appConfig.name}</string>
   <key>CFBundleIdentifier</key><string>com.appspawner.app.${appConfig.id}</string>
   <key>CFBundleExecutable</key><string>${appConfig.name}</string>
+  <key>CFBundleIconFile</key><string>icon.png</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSUIElement</key><false/>
 </dict>
 </plist>`;
     fs.writeFileSync(path.join(bundlePath, 'Contents', 'Info.plist'), plist);
 
-    return { success: true, path: bundlePath };
+    return { success: true, path: bundlePath, icon: iconPaths.png };
   } catch (err) {
     return { success: false, error: err.message };
   }
@@ -155,7 +182,7 @@ function _macRemove(appConfig) {
 
 // ── Linux ─────────────────────────────────────────────────────────────────────
 
-function _linuxCreate(appConfig, type) {
+async function _linuxCreate(appConfig, type) {
   try {
     const targetDir = type === 'desktop'
       ? app.getPath('desktop')
@@ -166,12 +193,13 @@ function _linuxCreate(appConfig, type) {
     const fileName    = `appspawner-${appConfig.id}.desktop`;
     const desktopPath = path.join(targetDir, fileName);
 
+    const iconPaths = await ensureAppIcon(appConfig);
     const entry = [
       '[Desktop Entry]',
       `Name=${appConfig.name}`,
       `Comment=Abrir ${appConfig.name} en AppSpawner`,
       `Exec="${process.execPath}" ${!app.isPackaged ? `"${app.getAppPath()}" ` : ''}--launch-app=${appConfig.id} %u`,
-      `Icon=appspawner`,
+      `Icon=${iconPaths.png}`,
       `Terminal=false`,
       `Type=Application`,
       `Categories=Network;WebBrowser;`,
@@ -181,7 +209,7 @@ function _linuxCreate(appConfig, type) {
     fs.writeFileSync(desktopPath, entry + '\n');
     fs.chmodSync(desktopPath, '755');
 
-    return { success: true, path: desktopPath };
+    return { success: true, path: desktopPath, icon: iconPaths.png };
   } catch (err) {
     return { success: false, error: err.message };
   }

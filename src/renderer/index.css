@@ -18,7 +18,32 @@
     --bg-base:    9 9 14;
     --bg-card:    17 17 24;
     --text-muted: 139 139 158;
+    --bg-base-color: #09090e;
+    --bg-card-color: #111118;
+    --bg-elevated-color: #18181f;
+    --accent-color: #7c3aed;
+    --text-primary-color: #ffffff;
   }
+}
+
+html[data-theme-preset] body,
+html[data-theme-preset] .bg-surface-base {
+  background-color: var(--bg-base-color) !important;
+}
+
+html[data-theme-preset] .bg-surface-card,
+html[data-theme-preset] .glass {
+  background-color: color-mix(in srgb, var(--bg-card-color) 82%, transparent) !important;
+}
+
+html[data-theme-preset] .bg-violet-600,
+html[data-theme-preset] .btn-primary {
+  background-color: var(--accent-color) !important;
+}
+
+html[data-theme-preset] .text-violet-300,
+html[data-theme-preset] .text-violet-400 {
+  color: color-mix(in srgb, var(--accent-color) 82%, white) !important;
 }
 
 /* ── Clases utilitarias de diseño ────────────────────────────────────────────── */

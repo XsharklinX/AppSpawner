@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Plus, Save, Globe, AlertCircle, CheckCircle2, ChevronDown, Image, Type, Monitor, Maximize2, PictureInPicture, Pencil } from 'lucide-react';
+import { ArrowLeft, Plus, Save, Globe, AlertCircle, CheckCircle2, ChevronDown, Image, Type, Monitor, Maximize2, PictureInPicture, Upload, Keyboard, Wrench, RotateCw, Home, StickyNote, Code2, Undo2, Redo2, LockKeyhole, ShieldCheck, Play, BriefcaseBusiness, UserRound } from 'lucide-react';
 import AppIcon    from '../components/common/AppIcon';
 import Switch     from '../components/common/Switch';
 import { useApps }        from '../contexts/AppContext';
@@ -21,6 +21,25 @@ const USER_AGENTS = [
   { label: 'Edge 120 (Windows)',     value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0' },
   { label: 'Firefox 121 (Windows)', value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0' },
   { label: 'Safari 17 (macOS)',      value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15' },
+];
+
+const TOOLBAR_BUTTONS = [
+  { value: 'back', label: 'Atras', icon: Undo2 },
+  { value: 'forward', label: 'Adelante', icon: Redo2 },
+  { value: 'reload', label: 'Recargar', icon: RotateCw },
+  { value: 'home', label: 'Inicio', icon: Home },
+  { value: 'pip', label: 'PiP', icon: PictureInPicture },
+  { value: 'notes', label: 'Notas', icon: StickyNote },
+  { value: 'devtools', label: 'DevTools', icon: Code2 },
+];
+
+const SHORTCUT_FIELDS = [
+  ['reload', 'Recargar'],
+  ['reloadAlt', 'Recargar alterno'],
+  ['back', 'Atras'],
+  ['forward', 'Adelante'],
+  ['devtools', 'DevTools'],
+  ['pip', 'PiP'],
 ];
 
 export default function CreateApp({
@@ -56,6 +75,33 @@ export default function CreateApp({
     },
     adblockEnabled: initialData?.adblockEnabled !== false,
     userAgent:      initialData?.userAgent    || '',
+    toolbar: {
+      enabled: initialData?.toolbar?.enabled || false,
+      buttons: initialData?.toolbar?.buttons || ['back','forward','reload','home','pip','notes','devtools'],
+    },
+    shortcuts: {
+      enabled: initialData?.shortcuts?.enabled !== false,
+      reload:    initialData?.shortcuts?.reload    || 'F5',
+      reloadAlt: initialData?.shortcuts?.reloadAlt || 'Ctrl+R',
+      back:      initialData?.shortcuts?.back      || 'Alt+ArrowLeft',
+      forward:   initialData?.shortcuts?.forward   || 'Alt+ArrowRight',
+      devtools:  initialData?.shortcuts?.devtools  || 'Ctrl+Shift+I',
+      pip:       initialData?.shortcuts?.pip       || 'Ctrl+Shift+P',
+    },
+    security: {
+      locked: initialData?.security?.locked || false,
+      sensitive: initialData?.security?.sensitive || false,
+      profile: initialData?.security?.profile || 'personal',
+    },
+    automation: {
+      onOpen: {
+        enabled: initialData?.automation?.onOpen?.enabled || false,
+        delayMs: initialData?.automation?.onOpen?.delayMs || 0,
+        reload: initialData?.automation?.onOpen?.reload || false,
+        injectCss: initialData?.automation?.onOpen?.injectCss || '',
+        injectJs: initialData?.automation?.onOpen?.injectJs || '',
+      },
+    },
     createShortcuts: true,
   });
 
@@ -65,8 +111,12 @@ export default function CreateApp({
   const [showUA,   setShowUA]     = useState(false);
 
   // Iniciales calculadas para el preview
-  const iconValue = form.iconValue || getInitials(form.name) || '?';
-  const previewIconType = form.iconType === 'favicon' && urlState === 'valid' ? 'favicon' : 'initials';
+  const iconValue = form.iconType === 'customImage'
+    ? form.iconValue
+    : form.iconValue || getInitials(form.name) || '?';
+  const previewIconType = form.iconType === 'customImage'
+    ? 'customImage'
+    : form.iconType === 'favicon' && urlState === 'valid' ? 'favicon' : 'initials';
 
   // Actualizar color automáticamente cuando cambia el nombre (solo al crear)
   useEffect(() => {
@@ -89,6 +139,16 @@ export default function CreateApp({
   const field = useCallback((key, val) => {
     setForm(prev => ({ ...prev, [key]: val }));
     setErrors(prev => ({ ...prev, [key]: '' }));
+  }, []);
+
+  const selectCustomIcon = useCallback(async () => {
+    const image = await window.electronAPI?.selectImage?.();
+    if (!image?.dataUrl) return;
+    setForm(prev => ({
+      ...prev,
+      iconType: 'customImage',
+      iconValue: image.dataUrl,
+    }));
   }, []);
 
   const validate = () => {
@@ -305,7 +365,7 @@ export default function CreateApp({
               <div className="flex gap-2 mb-3">
                 <button
                   type="button"
-                  onClick={() => field('iconType', 'favicon')}
+                  onClick={() => setForm(prev => ({ ...prev, iconType: 'favicon', iconValue: '' }))}
                   className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
                     form.iconType === 'favicon'
                       ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
@@ -320,7 +380,7 @@ export default function CreateApp({
                 </button>
                 <button
                   type="button"
-                  onClick={() => field('iconType', 'initials')}
+                  onClick={() => setForm(prev => ({ ...prev, iconType: 'initials', iconValue: '' }))}
                   className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
                     form.iconType === 'initials'
                       ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
@@ -329,6 +389,18 @@ export default function CreateApp({
                 >
                   <Type size={12} />
                   Iniciales
+                </button>
+                <button
+                  type="button"
+                  onClick={selectCustomIcon}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
+                    form.iconType === 'customImage'
+                      ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
+                      : 'bg-white/[0.03] border-white/[0.07] text-white/40 hover:text-white/60'
+                  }`}
+                >
+                  <Upload size={12} />
+                  Imagen propia
                 </button>
               </div>
 
@@ -445,6 +517,83 @@ export default function CreateApp({
                     </div>
                   </div>
 
+                  {/* Toolbar por app */}
+                  <div>
+                    <label className="form-label flex items-center gap-2">
+                      <Wrench size={12} /> Toolbar de ventana SSB
+                      <label className="flex items-center gap-1.5 ml-auto cursor-pointer">
+                        <div
+                          onClick={() => field('toolbar', { ...form.toolbar, enabled: !form.toolbar.enabled })}
+                          className={`relative w-8 h-4 rounded-full transition-colors ${form.toolbar.enabled ? 'bg-violet-600' : 'bg-white/[0.1]'}`}
+                        >
+                          <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${form.toolbar.enabled ? 'translate-x-4' : ''}`} />
+                        </div>
+                        <span className="text-[11px] text-white/40">Activar</span>
+                      </label>
+                    </label>
+                    <p className="text-[11px] text-white/30 leading-relaxed">
+                      Muestra una barra flotante discreta dentro de la ventana con acciones rapidas para navegacion, PiP, notas y DevTools.
+                    </p>
+                    {form.toolbar.enabled && (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+                        {TOOLBAR_BUTTONS.map(({ value, label, icon: Icon }) => {
+                          const checked = form.toolbar.buttons.includes(value);
+                          return (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => field('toolbar', {
+                                ...form.toolbar,
+                                buttons: checked
+                                  ? form.toolbar.buttons.filter(item => item !== value)
+                                  : [...form.toolbar.buttons, value],
+                              })}
+                              className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-[11px] border transition-all ${
+                                checked ? 'bg-violet-600/20 border-violet-500/35 text-violet-300' : 'bg-white/[0.03] border-white/[0.07] text-white/35 hover:text-white/60'
+                              }`}
+                            >
+                              <Icon size={13} />
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Atajos por app */}
+                  <div>
+                    <label className="form-label flex items-center gap-2">
+                      <Keyboard size={12} /> Atajos de teclado
+                      <label className="flex items-center gap-1.5 ml-auto cursor-pointer">
+                        <div
+                          onClick={() => field('shortcuts', { ...form.shortcuts, enabled: !form.shortcuts.enabled })}
+                          className={`relative w-8 h-4 rounded-full transition-colors ${form.shortcuts.enabled ? 'bg-violet-600' : 'bg-white/[0.1]'}`}
+                        >
+                          <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${form.shortcuts.enabled ? 'translate-x-4' : ''}`} />
+                        </div>
+                        <span className="text-[11px] text-white/40">Activar</span>
+                      </label>
+                    </label>
+                    <p className="text-[11px] text-white/30 leading-relaxed">
+                      Usa formato Electron: Ctrl+R, Alt+ArrowLeft, Ctrl+Shift+I. Se aplican solo dentro de esta app.
+                    </p>
+                    {form.shortcuts.enabled && (
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        {SHORTCUT_FIELDS.map(([key, label]) => (
+                          <label key={key} className="flex flex-col gap-1">
+                            <span className="text-[10px] text-white/35">{label}</span>
+                            <input
+                              value={form.shortcuts[key]}
+                              onChange={e => field('shortcuts', { ...form.shortcuts, [key]: e.target.value })}
+                              className="input-field text-xs py-2"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Proxy */}
                   <div>
                     <label className="form-label flex items-center gap-2">
@@ -525,6 +674,111 @@ export default function CreateApp({
                     <p className="text-[11px] text-white/25 mt-1">
                       Hereda la configuración global. Desactiva solo si la app falla con el bloqueador.
                     </p>
+                  </div>
+
+                  {/* Seguridad por app */}
+                  <div>
+                    <label className="form-label flex items-center gap-2">
+                      <ShieldCheck size={12} /> Seguridad y separacion
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { value: 'personal', label: 'Personal', icon: UserRound },
+                        { value: 'work', label: 'Trabajo', icon: BriefcaseBusiness },
+                      ].map(({ value, label, icon: Icon }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => field('security', { ...form.security, profile: value })}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs border transition-all ${
+                            form.security.profile === value
+                              ? 'bg-violet-600/20 border-violet-500/35 text-violet-300'
+                              : 'bg-white/[0.03] border-white/[0.07] text-white/35 hover:text-white/60'
+                          }`}
+                        >
+                          <Icon size={13} /> {label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => field('security', { ...form.security, sensitive: !form.security.sensitive })}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs border transition-all ${
+                          form.security.sensitive ? 'bg-amber-500/15 border-amber-500/30 text-amber-300' : 'bg-white/[0.03] border-white/[0.07] text-white/35 hover:text-white/60'
+                        }`}
+                      >
+                        <ShieldCheck size={13} /> Sensible
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => field('security', { ...form.security, locked: !form.security.locked })}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs border transition-all ${
+                          form.security.locked ? 'bg-red-500/15 border-red-500/30 text-red-300' : 'bg-white/[0.03] border-white/[0.07] text-white/35 hover:text-white/60'
+                        }`}
+                      >
+                        <LockKeyhole size={13} /> Pedir PIN al abrir
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-white/25 mt-1">
+                      Las apps bloqueadas requieren el PIN global configurado en Ajustes.
+                    </p>
+                  </div>
+
+                  {/* Automatizaciones al abrir */}
+                  <div>
+                    <label className="form-label flex items-center gap-2">
+                      <Play size={12} /> Automatizacion al abrir
+                      <label className="flex items-center gap-1.5 ml-auto cursor-pointer">
+                        <div
+                          onClick={() => field('automation', { ...form.automation, onOpen: { ...form.automation.onOpen, enabled: !form.automation.onOpen.enabled } })}
+                          className={`relative w-8 h-4 rounded-full transition-colors ${form.automation.onOpen.enabled ? 'bg-violet-600' : 'bg-white/[0.1]'}`}
+                        >
+                          <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${form.automation.onOpen.enabled ? 'translate-x-4' : ''}`} />
+                        </div>
+                        <span className="text-[11px] text-white/40">Activar</span>
+                      </label>
+                    </label>
+                    {form.automation.onOpen.enabled && (
+                      <div className="mt-2 flex flex-col gap-2">
+                        <div className="grid grid-cols-[120px_1fr] gap-2">
+                          <label className="text-[10px] text-white/35">
+                            Delay ms
+                            <input
+                              type="number"
+                              min="0"
+                              max="15000"
+                              value={form.automation.onOpen.delayMs}
+                              onChange={e => field('automation', { ...form.automation, onOpen: { ...form.automation.onOpen, delayMs: Number(e.target.value) || 0 } })}
+                              className="input-field text-xs py-2 mt-1"
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => field('automation', { ...form.automation, onOpen: { ...form.automation.onOpen, reload: !form.automation.onOpen.reload } })}
+                            className={`self-end flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs border transition-all ${
+                              form.automation.onOpen.reload ? 'bg-violet-600/20 border-violet-500/35 text-violet-300' : 'bg-white/[0.03] border-white/[0.07] text-white/35 hover:text-white/60'
+                            }`}
+                          >
+                            <RotateCw size={13} /> Recargar despues de abrir
+                          </button>
+                        </div>
+                        <textarea
+                          value={form.automation.onOpen.injectCss}
+                          onChange={e => field('automation', { ...form.automation, onOpen: { ...form.automation.onOpen, injectCss: e.target.value } })}
+                          placeholder="CSS opcional al abrir"
+                          className="input-field font-mono text-xs resize-none"
+                          rows={3}
+                        />
+                        <textarea
+                          value={form.automation.onOpen.injectJs}
+                          onChange={e => field('automation', { ...form.automation, onOpen: { ...form.automation.onOpen, injectJs: e.target.value } })}
+                          placeholder="JavaScript opcional al abrir"
+                          className="input-field font-mono text-xs resize-none"
+                          rows={3}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* User-Agent */}

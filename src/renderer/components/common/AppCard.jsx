@@ -83,7 +83,7 @@ const AppCard = React.memo(function AppCard({ app, onEdit }) {
     <div
       className={`
         relative glass rounded-2xl overflow-hidden cursor-pointer group
-        transition-all duration-200 min-h-[190px]
+        transition-all duration-200 min-h-[178px]
         ${hovered ? 'shadow-card-hover -translate-y-[3px] border-white/[0.12]' : 'shadow-card'}
         ${app.pinned ? 'ring-1 ring-violet-500/25' : ''}
       `}
@@ -121,13 +121,13 @@ const AppCard = React.memo(function AppCard({ app, onEdit }) {
       )}
 
       {/* ── Contenido ──────────────────────────────────────────────────── */}
-      <div className="relative flex flex-col gap-3 p-4 pt-5">
+      <div className="relative flex flex-col gap-3 p-4 pt-5 min-h-[178px]">
         {/* Ícono */}
         <div className="relative self-start">
           <AppIcon
             iconType={app.iconType} iconValue={app.iconValue}
             iconColor={app.iconColor} name={app.name} url={app.url}
-            size={56}
+            size={52}
             className={`transition-transform duration-200 ${hovered ? 'scale-[1.08]' : ''}`}
           />
           {badgeCount > 0 && (
@@ -139,7 +139,7 @@ const AppCard = React.memo(function AppCard({ app, onEdit }) {
 
         {/* Nombre */}
         <div>
-          <h3 className="text-[13px] font-bold text-white/90 leading-tight truncate">
+          <h3 className="text-sm font-bold text-white/90 leading-tight truncate">
             {app.name}
           </h3>
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
@@ -153,7 +153,7 @@ const AppCard = React.memo(function AppCard({ app, onEdit }) {
         </div>
 
         {/* Último uso */}
-        <div className="flex items-center gap-1.5 mt-auto">
+        <div className="flex items-center gap-1.5 mt-auto border-t border-white/[0.05] pt-3">
           <Clock size={10} className="text-white/18 flex-shrink-0" />
           <span className="text-[10px] text-white/28 truncate">{relativeTime}</span>
           {app.openCount > 0 && (
@@ -169,12 +169,12 @@ const AppCard = React.memo(function AppCard({ app, onEdit }) {
           transition-opacity duration-150
           ${hovered ? 'opacity-100' : 'opacity-0 pointer-events-none'}
         `}
-        style={{ background: 'rgba(9,9,14,0.93)', backdropFilter: 'blur(4px)' }}
+        style={{ background: 'rgba(12,12,18,0.96)', backdropFilter: 'blur(8px)' }}
       >
         {/* Abrir — botón principal */}
         <button
           onClick={handleLaunch}
-          className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 active:scale-[0.97] text-white text-sm font-semibold rounded-xl py-3 transition-all flex-shrink-0"
+          className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 active:scale-[0.97] text-white text-sm font-semibold rounded-xl py-3 transition-all flex-shrink-0 shadow-glow-sm"
         >
           {launching
             ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -231,13 +231,13 @@ const AppCard = React.memo(function AppCard({ app, onEdit }) {
         </div>
       </div>
     </div>
-    <Modal isOpen={showSessions} onClose={() => setShowSessions(false)} title={`Sesiones — ${app.name}`} size="md">
+    <Modal isOpen={showSessions} onClose={() => setShowSessions(false)} title={`Sesiones — ${app.name}`} size="lg">
       <SessionSnapshots app={app} onClose={() => setShowSessions(false)} />
     </Modal>
-    <Modal isOpen={showScripts} onClose={() => setShowScripts(false)} title={`Scripts — ${app.name}`} size="md">
+    <Modal isOpen={showScripts} onClose={() => setShowScripts(false)} title={`Scripts — ${app.name}`} size="xl">
       <AppScripts app={app} />
     </Modal>
-    <Modal isOpen={showSecurity} onClose={() => setShowSecurity(false)} title={`Seguridad — ${app.name}`} size="md">
+    <Modal isOpen={showSecurity} onClose={() => setShowSecurity(false)} title={`Seguridad — ${app.name}`} size="xl">
       <SecurityCenter app={app} />
     </Modal>
     </>

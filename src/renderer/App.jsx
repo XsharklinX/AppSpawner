@@ -121,6 +121,12 @@ export default function App() {
     checkUser();
   }, []);
 
+  useEffect(() => {
+    const showOnboarding = () => setIsOnboarding(true);
+    window.addEventListener('appspawner:show-onboarding', showOnboarding);
+    return () => window.removeEventListener('appspawner:show-onboarding', showOnboarding);
+  }, []);
+
   if (isOnboarding === null) return <LoadingScreen />;
 
   return (

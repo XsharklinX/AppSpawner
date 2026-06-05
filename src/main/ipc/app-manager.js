@@ -6,6 +6,9 @@
  */
 const { v4: uuidv4 } = require('uuid');
 const { app, session } = require('electron');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
 /** Genera un color de acento determinista */
 function seedColor(name) {
@@ -33,6 +36,77 @@ function sanitizeUrl(rawUrl) {
     return parsed.href;
   } catch {
     return null;
+  }
+}
+
+function removeNativeShortcuts(appConfig) {
+  if (!appConfig?.name) return;
+  const targets = process.platform === 'win32'
+    ? [
+        path.join(app.getPath('desktop'), `${appConfig.name}.lnk`),
+        path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', `${appConfig.name}.lnk`),
+      ]
+    : process.platform === 'darwin'
+      ? [
+          path.join(app.getPath('desktop'), `${appConfig.name}.app`),
+          path.join(app.getPath('home'), 'Applications', `${appConfig.name}.app`),
+        ]
+      : [
+          path.join(app.getPath('desktop'), `appspawner-${appConfig.id}.desktop`),
+          path.join(app.getPath('home'), '.local', 'share', 'applications', `appspawner-${appConfig.id}.desktop`),
+        ];
+
+  for (const target of targets) {
+    try {
+      if (!fs.existsSync(target)) continue;
+      const stat = fs.statSync(target);
+      if (stat.isDirectory()) fs.rmSync(target, { recursive: true, force: true });
+      else fs.unlinkSync(target);
+    } catch {}
+  }
+}
+
+function removeAppFiles(appId) {
+  const userData = app.getPath('userData');
+  const targets = [
+    path.join(userData, 'credentials', `${appId}.json`),
+    path.join(userData, 'totp', `${appId}.json`),
+    path.join(userData, 'user-scripts', `${appId}.json`),
+    path.join(userData, 'screenshots', appId),
+    path.join(userData, 'session-snapshots', appId),
+    path.join(userData, 'Partitions', `app_${appId}`),
+  ];
+
+  for (const target of targets) {
+    try {
+      if (!fs.existsSync(target)) continue;
+      const stat = fs.statSync(target);
+      if (stat.isDirectory()) fs.rmSync(target, { recursive: true, force: true });
+      else fs.unlinkSync(target);
+    } catch {}
+  }
+}
+
+function pruneAppReferences(data, appId) {
+  data.profiles = (data.profiles || []).map(profile => ({
+    ...profile,
+    appIds: Array.isArray(profile.appIds) ? profile.appIds.filter(id => id !== appId) : [],
+  }));
+  data.workspaces = (data.workspaces || []).map(workspace => ({
+    ...workspace,
+    appIds: Array.isArray(workspace.appIds) ? workspace.appIds.filter(id => id !== appId) : workspace.appIds,
+  }));
+}
+
+function verifySecurityPin(pin, settings = {}) {
+  if (!settings.securityPinHash || !settings.securityPinSalt) return false;
+  try {
+    const hash = crypto
+      .pbkdf2Sync(String(pin || ''), settings.securityPinSalt, 120000, 32, 'sha256')
+      .toString('hex');
+    return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(settings.securityPinHash, 'hex'));
+  } catch {
+    return false;
   }
 }
 
@@ -110,8 +184,10 @@ function registerAppManagerHandlers(ipcMain, store, createAppWindow, appWindows)
       name:         String(config.name).trim().slice(0, 80),
       url:          safeUrl,
       category:     config.category    || 'general',
-      iconType:     config.iconType    || 'initials',
-      iconValue:    String(config.iconValue || '').slice(0, 3) || config.name.trim().charAt(0).toUpperCase(),
+      iconType:     ['favicon','initials','emoji','customImage'].includes(config.iconType) ? config.iconType : 'initials',
+      iconValue:    config.iconType === 'customImage'
+        ? String(config.iconValue || '').slice(0, 7_000_000)
+        : String(config.iconValue || '').slice(0, 3) || config.name.trim().charAt(0).toUpperCase(),
       iconColor:    /^#[0-9a-fA-F]{6}$/.test(config.iconColor) ? config.iconColor : seedColor(config.name),
       accountLabel: accountLabel,
       workspaceId:  config.workspaceId || null,
@@ -130,6 +206,35 @@ function registerAppManagerHandlers(ipcMain, store, createAppWindow, appWindows)
       adblockCustomRules: Array.isArray(config.adblockCustomRules) ? config.adblockCustomRules : [],
       userAgent:    config.userAgent   || '',
       windowConfig,
+      toolbar: {
+        enabled: !!config.toolbar?.enabled,
+        buttons: Array.isArray(config.toolbar?.buttons)
+          ? config.toolbar.buttons.filter(b => ['back','forward','reload','home','pip','notes','devtools'].includes(b)).slice(0, 8)
+          : ['back','forward','reload','home','pip','notes','devtools'],
+      },
+      shortcuts: {
+        enabled: config.shortcuts?.enabled !== false,
+        reload:   String(config.shortcuts?.reload   || 'F5').slice(0, 40),
+        reloadAlt:String(config.shortcuts?.reloadAlt|| 'Ctrl+R').slice(0, 40),
+        back:     String(config.shortcuts?.back     || 'Alt+ArrowLeft').slice(0, 40),
+        forward:  String(config.shortcuts?.forward  || 'Alt+ArrowRight').slice(0, 40),
+        devtools: String(config.shortcuts?.devtools || 'Ctrl+Shift+I').slice(0, 40),
+        pip:      String(config.shortcuts?.pip      || 'Ctrl+Shift+P').slice(0, 40),
+      },
+      security: {
+        locked: !!config.security?.locked,
+        sensitive: !!config.security?.sensitive,
+        profile: ['personal','work'].includes(config.security?.profile) ? config.security.profile : 'personal',
+      },
+      automation: {
+        onOpen: {
+          enabled: !!config.automation?.onOpen?.enabled,
+          delayMs: Math.max(0, Math.min(15000, Number(config.automation?.onOpen?.delayMs) || 0)),
+          reload: !!config.automation?.onOpen?.reload,
+          injectCss: String(config.automation?.onOpen?.injectCss || '').slice(0, 50000),
+          injectJs: String(config.automation?.onOpen?.injectJs || '').slice(0, 50000),
+        },
+      },
       catalogId:    config.catalogId   || null,
       pinned:       false,
       lastUsed:     null,
@@ -145,6 +250,10 @@ function registerAppManagerHandlers(ipcMain, store, createAppWindow, appWindows)
   // ── UNINSTALL ─────────────────────────────────────────────────────────────
   ipcMain.handle('apps:uninstall', async (_event, appId) => {
     const data = store.read();
+    const appConfig = data.apps.find(a => a.id === appId);
+    removeNativeShortcuts(appConfig);
+    removeAppFiles(appId);
+    pruneAppReferences(data, appId);
     data.apps  = data.apps.filter(a => a.id !== appId);
     store.write(data);
 
@@ -164,14 +273,26 @@ function registerAppManagerHandlers(ipcMain, store, createAppWindow, appWindows)
   });
 
   // ── LAUNCH ────────────────────────────────────────────────────────────────
-  ipcMain.handle('apps:launch', async (_event, appId) => {
+  ipcMain.handle('apps:launch', async (_event, appId, options = {}) => {
     const data  = store.read();
     const index = data.apps.findIndex(a => a.id === appId);
     if (index === -1) return { success: false, error: 'App no encontrada' };
-    data.apps[index].openCount = (data.apps[index].openCount || 0) + 1;
-    store.write(data);
-    createAppWindow(data.apps[index]);
-    return { success: true };
+    if (data.apps[index].security?.locked) {
+      if (!data.settings.securityPinHash) {
+        return { success: false, requiresPin: true, error: 'Configura un PIN global antes de abrir apps bloqueadas.' };
+      }
+      if (!verifySecurityPin(options.pin, data.settings)) {
+        return { success: false, requiresPin: true, error: options.pin ? 'PIN incorrecto' : 'Esta app requiere PIN.' };
+      }
+    }
+    try {
+      createAppWindow(data.apps[index], { authorized: true });
+      data.apps[index].openCount = (data.apps[index].openCount || 0) + 1;
+      store.write(data);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message || 'No se pudo abrir la app' };
+    }
   });
 
   // ── UPDATE ────────────────────────────────────────────────────────────────
@@ -187,8 +308,13 @@ function registerAppManagerHandlers(ipcMain, store, createAppWindow, appWindows)
       updates.url = safeUrl;
     }
 
+    const previousApp = data.apps[index];
+
     // Prohibir cambiar id / installedAt
     const { id, installedAt, ...safeUpdates } = updates;
+    if (safeUpdates.name && safeUpdates.name !== previousApp.name) {
+      removeNativeShortcuts(previousApp);
+    }
     data.apps[index] = { ...data.apps[index], ...safeUpdates };
     store.write(data);
     return data.apps[index];

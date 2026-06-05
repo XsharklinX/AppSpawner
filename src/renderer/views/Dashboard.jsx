@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Search, Plus, Compass, Loader2, Clock, FolderOpen, Trash2 } from 'lucide-react';
+import { Search, Plus, Compass, Loader2, Clock, FolderOpen, Trash2, UserRound, BriefcaseBusiness, Layers3 } from 'lucide-react';
 import AppCard   from '../components/common/AppCard';
 import AppIcon   from '../components/common/AppIcon';
 import Modal     from '../components/common/Modal';
@@ -14,6 +14,7 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
   const { workspaces }                = useWorkspaces();
   const { t }                          = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
+  const [profileFilter, setProfileFilter] = useState('all');
   const [editingApp,  setEditingApp]  = useState(null);
   const [showWSModal, setShowWSModal] = useState(false);
 
@@ -28,8 +29,11 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
     if (selectedWorkspace) {
       result = result.filter(a => a.workspaceId === selectedWorkspace);
     }
+    if (profileFilter !== 'all') {
+      result = result.filter(a => (a.security?.profile || 'personal') === profileFilter);
+    }
     return filterApps(result, searchQuery);
-  }, [apps, selectedCategory, selectedWorkspace, searchQuery]);
+  }, [apps, selectedCategory, selectedWorkspace, profileFilter, searchQuery]);
 
   const showRecent = !searchQuery && selectedCategory === 'all' && recentApps.length > 0;
   const isEmpty    = apps.length === 0 && !loading;
@@ -52,7 +56,7 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
 
           {/* Búsqueda */}
           {apps.length > 0 && (
-            <div className="relative w-60 flex-shrink-0">
+            <div className="relative w-64 flex-shrink-0">
               <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
               <input
                 type="text"
@@ -65,7 +69,7 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
                 <button
                   onClick={() => setSearchQuery('')}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/60 text-xs"
-                >✕</button>
+                >x</button>
               )}
             </div>
           )}
@@ -87,6 +91,28 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
           >
             <FolderOpen size={11} /> Crear workspace
           </button>
+        )}
+
+        {apps.length > 0 && (
+          <div className="flex gap-2 mt-3">
+            {[
+              { id: 'all', label: 'Todas', icon: Layers3 },
+              { id: 'personal', label: 'Personal', icon: UserRound },
+              { id: 'work', label: 'Trabajo', icon: BriefcaseBusiness },
+            ].map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setProfileFilter(id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs border transition-all ${
+                  profileFilter === id
+                    ? 'bg-violet-600/20 border-violet-500/35 text-violet-300'
+                    : 'bg-white/[0.035] border-white/[0.06] text-white/35 hover:text-white/60'
+                }`}
+              >
+                <Icon size={12} /> {label}
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
@@ -139,7 +165,7 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
             )}
 
             {/* ── Grid principal ─────────────────────────────────────────── */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 animate-fade-in">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,260px))] justify-start gap-4 animate-fade-in">
               {filteredApps.map((app, i) => (
                 <div
                   key={app.id}
@@ -304,7 +330,7 @@ function WorkspaceManager({ onClose }) {
             value={name}
             onChange={e => setName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleCreate()}
-            placeholder="Nombre del workspace…"
+            placeholder="Nombre del workspace..."
             className="input-field"
             maxLength={50}
             autoFocus
