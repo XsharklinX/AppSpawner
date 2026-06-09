@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { KeyRound, Eye, EyeOff, Save, Trash2, Zap, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 import { useApps }  from '../contexts/AppContext';
+import EmptyState   from './common/EmptyState';
 
 export default function AppCredentials({ app }) {
   const toast = useToast();
@@ -99,10 +100,7 @@ export default function AppCredentials({ app }) {
           </button>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-8 gap-3 text-white/25">
-          <KeyRound size={32} />
-          <p className="text-sm">Sin credenciales guardadas</p>
-        </div>
+        <EmptyState icon={KeyRound} title="Sin credenciales guardadas" compact />
       )}
 
       {/* Formulario de edición */}

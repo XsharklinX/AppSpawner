@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Search, Plus, Compass, Loader2, Clock, FolderOpen, Trash2, UserRound, BriefcaseBusiness, Layers3 } from 'lucide-react';
+import { Search, Plus, Compass, Loader2, Clock, FolderOpen, Trash2, UserRound, BriefcaseBusiness, Layers3, TrendingUp } from 'lucide-react';
 import AppCard   from '../components/common/AppCard';
 import AppIcon   from '../components/common/AppIcon';
 import Modal     from '../components/common/Modal';
@@ -9,9 +9,9 @@ import { useI18n }        from '../contexts/I18nContext';
 import { useWorkspaces }  from '../contexts/WorkspaceContext';
 import { filterApps }     from '../lib/utils';
 
-export default function Dashboard({ selectedCategory, selectedWorkspace, onSelectWorkspace, onNavigate }) {
-  const { apps, recentApps, loading } = useApps();
-  const { workspaces }                = useWorkspaces();
+export default function Dashboard({ selectedCategory, selectedWorkspace, onSelectWorkspace, onNavigate, onOpenTools }) {
+  const { apps, recentApps, loading, openWindows } = useApps();
+  const { workspaces }                             = useWorkspaces();
   const { t }                          = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
   const [profileFilter, setProfileFilter] = useState('all');
@@ -38,6 +38,17 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
   const showRecent = !searchQuery && selectedCategory === 'all' && recentApps.length > 0;
   const isEmpty    = apps.length === 0 && !loading;
 
+  const mostUsed = useMemo(() =>
+    apps.length ? [...apps].sort((a, b) => (b.openCount || 0) - (a.openCount || 0))[0] : null,
+    [apps]);
+
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const inactiveApps = useMemo(() =>
+    apps.filter(a => a.lastUsed && a.lastUsed < sevenDaysAgo && !openWindows?.has(a.id)).slice(0, 3),
+    [apps, openWindows]);
+
+  const openCount = openWindows?.size || 0;
+
   return (
     <div className="h-full flex flex-col overflow-hidden">
 
@@ -45,11 +56,11 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
       <div className="flex-shrink-0 px-7 pt-6 pb-3">
         <div className="flex items-center justify-between gap-4 mb-3">
           <div>
-            <h1 className="text-xl font-bold text-white">{t('dash_title')}</h1>
-            <p className="text-sm text-white/35 mt-0.5">
+            <h1 className="text-xl font-bold text-fg">{t('dash_title')}</h1>
+            <p className="text-sm text-fg/35 mt-0.5">
               {t('dash_subtitle')}
               {apps.length > 0 && (
-                <span className="ml-2 text-white/45 font-medium">— {apps.length} apps</span>
+                <span className="ml-2 text-fg/45 font-medium">— {apps.length} apps</span>
               )}
             </p>
           </div>
@@ -57,7 +68,7 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
           {/* Búsqueda */}
           {apps.length > 0 && (
             <div className="relative w-64 flex-shrink-0">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg/25 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
@@ -68,7 +79,7 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/60 text-xs"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg/25 hover:text-fg/60 text-xs"
                 >x</button>
               )}
             </div>
@@ -87,7 +98,7 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
         {workspaces.length === 0 && apps.length > 0 && (
           <button
             onClick={() => setShowWSModal(true)}
-            className="text-[11px] text-white/20 hover:text-violet-400 transition-colors flex items-center gap-1.5 mb-1"
+            className="text-[11px] text-fg/20 hover:text-violet-400 transition-colors flex items-center gap-1.5 mb-1"
           >
             <FolderOpen size={11} /> Crear workspace
           </button>
@@ -106,7 +117,7 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs border transition-all ${
                   profileFilter === id
                     ? 'bg-violet-600/20 border-violet-500/35 text-violet-300'
-                    : 'bg-white/[0.035] border-white/[0.06] text-white/35 hover:text-white/60'
+                    : 'bg-overlay/[0.035] border-line/[0.06] text-fg/35 hover:text-fg/60'
                 }`}
               >
                 <Icon size={12} /> {label}
@@ -118,6 +129,24 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
 
       {/* ── Contenido ─────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto scrollbar-thin px-7 pb-6">
+
+        {/* ── Hub stats bar ──────────────────────────────────────────── */}
+        {!loading && apps.length > 0 && !searchQuery && (
+          <div className="flex items-center gap-4 mb-4 text-[11px] text-fg/28 select-none">
+            {openCount > 0 && (
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/70 animate-pulse inline-block" />
+                {openCount} {openCount === 1 ? 'abierta ahora' : 'abiertas ahora'}
+              </span>
+            )}
+            {mostUsed && mostUsed.openCount > 0 && (
+              <span className="flex items-center gap-1.5 text-fg/22">
+                más usada: <span className="text-fg/42 font-medium">{mostUsed.name}</span>
+                <span className="text-fg/32">({mostUsed.openCount}×)</span>
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Cargando */}
         {loading && (
@@ -138,9 +167,9 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
         {/* Sin resultados de búsqueda */}
         {!isEmpty && !loading && filteredApps.length === 0 && (
           <div className="flex flex-col items-center justify-center h-48 gap-2">
-            <Search size={28} className="text-white/12" />
-            <p className="text-sm text-white/35">
-              {t('dash_no_results')} "<span className="text-white/60">{searchQuery}</span>"
+            <Search size={28} className="text-fg/12" />
+            <p className="text-sm text-fg/35">
+              {t('dash_no_results')} "<span className="text-fg/60">{searchQuery}</span>"
             </p>
           </div>
         )}
@@ -151,13 +180,28 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
             {showRecent && (
               <section className="mb-6">
                 <div className="flex items-center gap-2 mb-3">
-                  <Clock size={13} className="text-white/30" />
-                  <h2 className="text-xs font-semibold text-white/35 uppercase tracking-wider">
+                  <Clock size={13} className="text-fg/30" />
+                  <h2 className="text-xs font-semibold text-fg/35 uppercase tracking-wider">
                     Abiertas recientemente
                   </h2>
                 </div>
                 <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
                   {recentApps.map(app => (
+                    <RecentChip key={app.id} app={app} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* ── Recomendaciones: apps sin usar en 7+ días ─────────────── */}
+            {showRecent && inactiveApps.length > 0 && (
+              <section className="mb-6">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <TrendingUp size={12} className="text-amber-400/50" />
+                  <h2 className="text-[11px] font-semibold text-fg/30 uppercase tracking-wider">Sin abrir en 7 días</h2>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  {inactiveApps.map(app => (
                     <RecentChip key={app.id} app={app} />
                   ))}
                 </div>
@@ -172,14 +216,11 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
                   className="animate-slide-up"
                   style={{ animationDelay: `${Math.min(i * 25, 300)}ms`, animationFillMode: 'both' }}
                 >
-                  <AppCard app={app} onEdit={handleEdit} />
+                  <AppCard app={app} onEdit={handleEdit} onOpenTools={onOpenTools} />
                 </div>
               ))}
 
-              {/* Tarjeta de añadir app */}
-              {!searchQuery && (
-                <AddCard onClick={() => onNavigate('create')} t={t} />
-              )}
+              {/* Botón sutil de añadir app (solo texto, no toma espacio de grid) */}
             </div>
           </>
         )}
@@ -225,8 +266,8 @@ function WorkspaceBar({ workspaces, selected, onSelect, onManage }) {
         onClick={() => onSelect(null)}
         className={`flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${
           !selected
-            ? 'bg-white/[0.08] text-white/80'
-            : 'text-white/35 hover:text-white/60 hover:bg-white/[0.03]'
+            ? 'bg-overlay/[0.08] text-fg/80'
+            : 'text-fg/35 hover:text-fg/60 hover:bg-overlay/[0.03]'
         }`}
       >
         Todas
@@ -237,8 +278,8 @@ function WorkspaceBar({ workspaces, selected, onSelect, onManage }) {
           onClick={() => onSelect(selected === ws.id ? null : ws.id)}
           className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${
             selected === ws.id
-              ? 'text-white/90 border'
-              : 'text-white/35 hover:text-white/65 hover:bg-white/[0.03] border border-transparent'
+              ? 'text-fg/90 border'
+              : 'text-fg/35 hover:text-fg/65 hover:bg-overlay/[0.03] border border-transparent'
           }`}
           style={selected === ws.id ? { background: `${ws.color}22`, borderColor: `${ws.color}55`, color: ws.color } : {}}
         >
@@ -248,7 +289,7 @@ function WorkspaceBar({ workspaces, selected, onSelect, onManage }) {
       ))}
       <button
         onClick={onManage}
-        className="flex-shrink-0 text-xs text-white/20 hover:text-violet-400 px-2 py-1.5 transition-colors"
+        className="flex-shrink-0 text-xs text-fg/20 hover:text-violet-400 px-2 py-1.5 transition-colors"
         title="Gestionar workspaces"
       >
         ⚙
@@ -288,13 +329,13 @@ function WorkspaceManager({ onClose }) {
               <div key={ws.id} className="flex items-center gap-3 glass rounded-xl px-3 py-2.5">
                 <span className="text-lg flex-shrink-0">{ws.emoji}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white/80">{ws.name}</p>
-                  <p className="text-[11px] text-white/30">{count} apps</p>
+                  <p className="text-sm font-medium text-fg/80">{ws.name}</p>
+                  <p className="text-[11px] text-fg/30">{count} apps</p>
                 </div>
                 <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: ws.color }} />
                 <button
                   onClick={() => deleteWorkspace(ws.id)}
-                  className="text-white/20 hover:text-red-400 transition-colors p-1"
+                  className="text-fg/20 hover:text-red-400 transition-colors p-1"
                   title="Eliminar workspace"
                 >
                   <Trash2 size={12} />
@@ -306,8 +347,8 @@ function WorkspaceManager({ onClose }) {
       )}
 
       {/* Crear nuevo workspace */}
-      <div className="border-t border-white/[0.06] pt-4">
-        <p className="text-xs font-semibold text-white/35 uppercase tracking-wider mb-3">Nuevo workspace</p>
+      <div className="border-t border-line/[0.06] pt-4">
+        <p className="text-xs font-semibold text-fg/35 uppercase tracking-wider mb-3">Nuevo workspace</p>
         <div className="flex flex-col gap-3">
           {/* Emoji picker */}
           <div className="flex gap-1.5 flex-wrap">
@@ -316,7 +357,7 @@ function WorkspaceManager({ onClose }) {
                 key={e}
                 onClick={() => setEmoji(e)}
                 className={`text-lg w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
-                  emoji === e ? 'bg-white/[0.12] ring-1 ring-white/30' : 'hover:bg-white/[0.06]'
+                  emoji === e ? 'bg-overlay/[0.12] ring-1 ring-fg/30' : 'hover:bg-overlay/[0.06]'
                 }`}
               >
                 {e}
@@ -343,7 +384,7 @@ function WorkspaceManager({ onClose }) {
                 key={c}
                 onClick={() => setColor(c)}
                 className={`w-7 h-7 rounded-lg transition-all ${
-                  color === c ? 'ring-2 ring-white/70 ring-offset-1 ring-offset-surface-card scale-110' : 'opacity-60 hover:opacity-100'
+                  color === c ? 'ring-2 ring-fg/70 ring-offset-1 ring-offset-surface-card scale-110' : 'opacity-60 hover:opacity-100'
                 }`}
                 style={{ background: c }}
               />
@@ -384,7 +425,7 @@ const RecentChip = React.memo(function RecentChip({ app }) {
         url={app.url}
         size={22}
       />
-      <span className="text-xs font-medium text-white/65 group-hover:text-white/90 transition-colors whitespace-nowrap">
+      <span className="text-xs font-medium text-fg/65 group-hover:text-fg/90 transition-colors whitespace-nowrap">
         {app.name}
       </span>
     </button>
@@ -400,8 +441,8 @@ function AddCard({ onClick, t }) {
       className="
         glass rounded-2xl p-4 min-h-[160px]
         flex flex-col items-center justify-center gap-2
-        border-dashed border-white/[0.06] hover:border-violet-500/30
-        text-white/20 hover:text-violet-400 transition-all duration-200 group
+        border-dashed border-line/[0.06] hover:border-violet-500/30
+        text-fg/20 hover:text-violet-400 transition-all duration-200 group
       "
     >
       <div className="w-10 h-10 rounded-xl border-2 border-dashed border-current flex items-center justify-center transition-colors">
@@ -419,7 +460,7 @@ function EmptyState({ onExplore, onCreate, t }) {
     <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-6 animate-fade-in">
       {/* Ilustración */}
       <div className="relative">
-        <div className="w-24 h-24 rounded-3xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
+        <div className="w-24 h-24 rounded-3xl bg-overlay/[0.03] border border-line/[0.06] flex items-center justify-center">
           <div className="grid grid-cols-2 gap-2 p-3">
             {['#7c3aed','#2563eb','#059669','#d97706'].map(c => (
               <div key={c} className="w-7 h-7 rounded-xl animate-pulse" style={{ background: c, animationDelay: `${Math.random()*500}ms` }} />
@@ -432,8 +473,8 @@ function EmptyState({ onExplore, onCreate, t }) {
       </div>
 
       <div className="text-center max-w-xs">
-        <h3 className="text-base font-semibold text-white/80 mb-1.5">{t('dash_empty_title')}</h3>
-        <p className="text-sm text-white/35 leading-relaxed">{t('dash_empty_desc')}</p>
+        <h3 className="text-base font-semibold text-fg/80 mb-1.5">{t('dash_empty_title')}</h3>
+        <p className="text-sm text-fg/35 leading-relaxed">{t('dash_empty_desc')}</p>
       </div>
 
       <div className="flex gap-3">

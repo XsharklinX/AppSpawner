@@ -12,6 +12,10 @@
     --bg-base:     248 250 252;
     --bg-card:     255 255 255;
     --text-muted:  100 116 139;
+    /* Tokens adaptativos: oscuro-sobre-claro */
+    --fg-rgb:      17 24 39;
+    --overlay-rgb: 0 0 0;
+    --line-rgb:    0 0 0;
   }
 
   html.dark, html {
@@ -23,6 +27,10 @@
     --bg-elevated-color: #18181f;
     --accent-color: #7c3aed;
     --text-primary-color: #ffffff;
+    /* Tokens adaptativos: blanco-sobre-oscuro (comportamiento actual) */
+    --fg-rgb:      255 255 255;
+    --overlay-rgb: 255 255 255;
+    --line-rgb:    255 255 255;
   }
 }
 
@@ -33,8 +41,28 @@ html[data-theme-preset] .bg-surface-base {
 
 html[data-theme-preset] .bg-surface-card,
 html[data-theme-preset] .glass {
-  background-color: color-mix(in srgb, var(--bg-card-color) 82%, transparent) !important;
+  background-color: color-mix(in srgb, var(--bg-card-color) var(--glass-opacity, 82%), transparent) !important;
 }
+
+/* Los dialogos y menus flotantes se superponen a otro contenido (tarjetas, listas),
+   asi que necesitan un piso de opacidad mas alto que las superficies normales:
+   con el glassmorphism al minimo (60%) el contenido de atras se mezcla y vuelve
+   todo ilegible. Forzamos un minimo de 90% solo para estas superficies. */
+html[data-theme-preset] [role="dialog"] .glass,
+html[data-theme-preset] [role="menu"] .glass {
+  background-color: color-mix(in srgb, var(--bg-card-color) max(var(--glass-opacity, 82%), 90%), transparent) !important;
+}
+
+/* Radio de bordes ajustable desde Apariencia (los valores por defecto igualan los de Tailwind) */
+.rounded-lg  { border-radius: var(--ui-radius-lg, 0.5rem) !important; }
+.rounded-xl  { border-radius: var(--ui-radius-xl, 0.75rem) !important; }
+.rounded-2xl { border-radius: var(--ui-radius-2xl, 1rem) !important; }
+.rounded-3xl { border-radius: var(--ui-radius-3xl, 1.5rem) !important; }
+
+/* Densidad: escala el tamaño de fuente raíz, lo que reescala spacing/tamaños en rem */
+html[data-ui-density="compact"]     { font-size: 14px; }
+html[data-ui-density="comfortable"] { font-size: 16px; }
+html[data-ui-density="spacious"]    { font-size: 17px; }
 
 html[data-theme-preset] .bg-violet-600,
 html[data-theme-preset] .btn-primary {
@@ -48,9 +76,10 @@ html[data-theme-preset] .text-violet-400 {
 
 /* ── Clases utilitarias de diseño ────────────────────────────────────────────── */
 @layer components {
-  /* Glass morphism card */
+  /* Glass morphism card — fondo sólido oscuro + blur para mantener buen contraste de texto */
   .glass {
-    @apply bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl;
+    @apply backdrop-blur-xl border border-white/[0.07] rounded-2xl;
+    background-color: rgba(17, 17, 24, 0.9);
   }
   .glass-hover {
     @apply hover:bg-white/[0.05] hover:border-white/[0.09] transition-all duration-200;
@@ -153,7 +182,7 @@ body {
   /* Desactivar selección de texto por defecto (app de escritorio) */
   user-select: none;
   -webkit-user-select: none;
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--ui-font-family, -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif);
 }
 
 /* Re-habilitar selección en inputs */

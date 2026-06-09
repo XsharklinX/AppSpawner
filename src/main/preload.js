@@ -52,6 +52,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getStorageInfo: ()      => invoke('storage:get-info'),
   clearAppData:   (appId) => invoke('storage:clear-app-data', appId),
 
+  // ── DIAGNOSTICO POR APP ───────────────────────────────────────────────────
+  getAppDiagnostics:    (appId) => invoke('diagnostics:get-app', appId),
+  clearDiagnosticErrors: (appId) => invoke('diagnostics:clear-errors', appId),
+
   // ── TRAY ──────────────────────────────────────────────────────────────────
   refreshTray: () => send('tray:refresh'),
 
@@ -79,6 +83,51 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onQuickLauncherToggle: (cb) => {
     ipcRenderer.on('quicklauncher:toggle', () => cb());
     return () => ipcRenderer.removeAllListeners('quicklauncher:toggle');
+  },
+
+  // ── HISTORIAL DE NAVEGACIÓN (panel central) ───────────────────────────────
+  listHistory:  (opts)   => invoke('history:list', opts),
+  removeHistoryEntry: (id) => invoke('history:remove', id),
+  clearHistory: (appId)  => invoke('history:clear', appId),
+
+  // ── DESCARGAS (panel central) ─────────────────────────────────────────────
+  listDownloads:      ()      => invoke('downloads:list'),
+  openDownloadFile:   (id)    => invoke('downloads:open-file',   id),
+  openDownloadFolder: (id)    => invoke('downloads:open-folder', id),
+  removeDownload:     (id)    => invoke('downloads:remove', id),
+  clearDownloads:     ()      => invoke('downloads:clear'),
+  onDownloadStarted:  (cb) => {
+    const h = (_e, rec) => cb(rec);
+    ipcRenderer.on('downloads:started', h);
+    return () => ipcRenderer.removeListener('downloads:started', h);
+  },
+  onDownloadProgress: (cb) => {
+    const h = (_e, data) => cb(data);
+    ipcRenderer.on('downloads:progress', h);
+    return () => ipcRenderer.removeListener('downloads:progress', h);
+  },
+  onDownloadDone: (cb) => {
+    const h = (_e, rec) => cb(rec);
+    ipcRenderer.on('downloads:done', h);
+    return () => ipcRenderer.removeListener('downloads:done', h);
+  },
+
+  onAdBlockCosmeticRuleAdded: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on('adblock:cosmetic-rule-added', handler);
+    return () => ipcRenderer.removeListener('adblock:cosmetic-rule-added', handler);
+  },
+
+  onAdBlockPageBroken: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on('adblock:page-broken', handler);
+    return () => ipcRenderer.removeListener('adblock:page-broken', handler);
+  },
+
+  onAdBlockAppToggled: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on('adblock:app-toggled', handler);
+    return () => ipcRenderer.removeListener('adblock:app-toggled', handler);
   },
 
   // ── WORKSPACES ────────────────────────────────────────────────────────────
@@ -139,15 +188,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openScreenshotsDir: (appId) => invoke('screenshots:open-dir', appId),
 
   // ── AD BLOCK ──────────────────────────────────────────────────────────────
-  getAdBlockConfig:       ()              => invoke('adblock:get-config'),
-  updateAdBlockConfig:    (updates)       => invoke('adblock:update-config', updates),
-  getAdBlockSubscriptions: ()             => invoke('adblock:get-subscriptions'),
-  updateAdBlockSubscriptions: (items)     => invoke('adblock:update-subscriptions', items),
-  setAdBlockSubscriptions: (items)        => invoke('adblock:set-subscriptions', items),
-  getAppAdBlockConfig:    (appId)         => invoke('adblock:get-app-config', appId),
-  updateAppAdBlockConfig: (appId, cfg)    => invoke('adblock:update-app-config', appId, cfg),
-  getAdBlockCount:        (appId)         => invoke('adblock:get-blocked-count', appId),
-  resetAdBlockCount:      (appId)         => invoke('adblock:reset-count', appId),
+  getAdBlockConfig:           ()                => invoke('adblock:get-config'),
+  updateAdBlockConfig:        (updates)         => invoke('adblock:update-config', updates),
+  getAdBlockSubscriptions:    ()                => invoke('adblock:get-subscriptions'),
+  updateAdBlockSubscriptions: (items)           => invoke('adblock:update-subscriptions', items),
+  setAdBlockSubscriptions:    (items)           => invoke('adblock:set-subscriptions', items),
+  getAppAdBlockConfig:        (appId)           => invoke('adblock:get-app-config', appId),
+  updateAppAdBlockConfig:     (appId, cfg)      => invoke('adblock:update-app-config', appId, cfg),
+  getAdBlockCount:            (appId)           => invoke('adblock:get-blocked-count', appId),
+  resetAdBlockCount:          (appId)           => invoke('adblock:reset-count', appId),
+  getAdBlockLog:              (appId)           => invoke('adblock:get-log', appId),
+  clearAdBlockLog:            (appId)           => invoke('adblock:clear-log', appId),
+  exportAdBlockRules:         (appId)           => invoke('adblock:export-rules', appId),
+  importAdBlockRules:         (appId, text)     => invoke('adblock:import-rules', appId, text),
+  addAdBlockCosmeticRule:     (appId, dom, sel) => invoke('adblock:add-cosmetic-rule', appId, dom, sel),
+  startAdBlockElementPicker:  (appId)           => invoke('adblock:start-element-picker', appId),
+
+  // ── MÉTRICAS DE USO ───────────────────────────────────────────────────────
+  recordAppTime: (appId, ms) => invoke('app:record-time', appId, ms),
 
   // ── DATOS ─────────────────────────────────────────────────────────────────
   exportData: ()        => invoke('data:export'),

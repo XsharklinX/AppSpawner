@@ -24,10 +24,24 @@ export default function Modal({
     '2xl': 'max-w-5xl',
   };
 
-  // Cierre con Escape
+  // Cierre con Escape + atrapar el foco dentro del diálogo (Tab no debe escapar al fondo)
   useEffect(() => {
     if (!isOpen) return;
-    const handler = (e) => { if (e.key === 'Escape') onClose?.(); };
+    const handler = (e) => {
+      if (e.key === 'Escape') { onClose?.(); return; }
+      if (e.key !== 'Tab') return;
+      const focusable = dialogRef.current?.querySelectorAll(
+        'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusable || focusable.length === 0) return;
+      const first = focusable[0];
+      const last  = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus();
+      }
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isOpen, onClose]);

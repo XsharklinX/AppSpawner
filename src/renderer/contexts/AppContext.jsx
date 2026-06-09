@@ -22,6 +22,7 @@ function appReducer(state, action) {
           ? { ...a, lastUsed: Date.now(), openCount: (a.openCount || 0) + 1 }
           : a),
         openWindows: next,
+        _launchTime: { ...(state._launchTime || {}), [action.id]: Date.now() },
       };
     }
     case 'WINDOW_CLOSED': {
@@ -42,13 +43,22 @@ export function AppProvider({ children }) {
   const { t }      = useI18n();
   const loadingRef = useRef(false);
   const pinResolverRef = useRef(null);
+  const windowStartTimes = useRef({});
   const [pinDialog, setPinDialog] = useState(null);
   const [pinInput, setPinInput] = useState('');
 
   useEffect(() => { loadApps(); }, []);
 
   useEffect(() => {
-    const unsub = window.electronAPI?.onAppWindowClosed?.((id) => dispatch({ type: 'WINDOW_CLOSED', id }));
+    const unsub = window.electronAPI?.onAppWindowClosed?.((id) => {
+      const start = windowStartTimes.current[id];
+      if (start) {
+        const elapsed = Date.now() - start;
+        delete windowStartTimes.current[id];
+        if (elapsed > 0) window.electronAPI?.recordAppTime?.(id, elapsed).catch(() => {});
+      }
+      dispatch({ type: 'WINDOW_CLOSED', id });
+    });
     return () => unsub?.();
   }, []);
 
@@ -135,10 +145,10 @@ export function AppProvider({ children }) {
     } catch (err) { toast.error(t('error'), err.message); throw err; }
   }, [toast, t]);
 
-  const launchApp = useCallback(async (appId) => {
+  const launchApp = useCallback(async (appId, extraOptions = {}) => {
     try {
       const app = state.apps.find(a => a.id === appId);
-      let options = {};
+      let options = { ...extraOptions };
       if (app?.security?.locked) {
         const pin = await requestPin(app.name);
         if (!pin) return;
@@ -148,6 +158,7 @@ export function AppProvider({ children }) {
       if (result && result.success === false) {
         throw new Error(result.error || 'No se pudo abrir la app');
       }
+      windowStartTimes.current[appId] = Date.now();
       dispatch({ type: 'MARK_LAUNCHED', id: appId });
     } catch (err) {
       toast.error(err.message || t('toast_error_launch'), state.apps.find(a => a.id === appId)?.name ?? '');

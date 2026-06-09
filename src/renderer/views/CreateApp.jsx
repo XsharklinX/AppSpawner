@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Plus, Save, Globe, AlertCircle, CheckCircle2, ChevronDown, Image, Type, Monitor, Maximize2, PictureInPicture, Upload, Keyboard, Wrench, RotateCw, Home, StickyNote, Code2, Undo2, Redo2, LockKeyhole, ShieldCheck, Play, BriefcaseBusiness, UserRound } from 'lucide-react';
 import AppIcon    from '../components/common/AppIcon';
 import Switch     from '../components/common/Switch';
+import ShortcutInput from '../components/common/ShortcutInput';
 import { useApps }        from '../contexts/AppContext';
 import { useI18n }        from '../contexts/I18nContext';
 import { useWorkspaces }  from '../contexts/WorkspaceContext';
@@ -74,6 +75,7 @@ export default function CreateApp({
       interval: initialData?.screenshotConfig?.interval || 30,
     },
     adblockEnabled: initialData?.adblockEnabled !== false,
+    notificationsEnabled: initialData?.notificationsEnabled === true,
     userAgent:      initialData?.userAgent    || '',
     toolbar: {
       enabled: initialData?.toolbar?.enabled || false,
@@ -174,6 +176,7 @@ export default function CreateApp({
         workspaceId:     form.workspaceId  || null,
         openMode:        form.openMode     || 'normal',
         adblockEnabled:  form.adblockEnabled,
+        notificationsEnabled: form.notificationsEnabled,
         iconType:        form.iconType,
       };
 
@@ -576,17 +579,16 @@ export default function CreateApp({
                       </label>
                     </label>
                     <p className="text-[11px] text-white/30 leading-relaxed">
-                      Usa formato Electron: Ctrl+R, Alt+ArrowLeft, Ctrl+Shift+I. Se aplican solo dentro de esta app.
+                      Haz clic en un atajo y pulsa la combinación deseada. Se aplican solo dentro de esta app.
                     </p>
                     {form.shortcuts.enabled && (
                       <div className="grid grid-cols-2 gap-2 mt-2">
                         {SHORTCUT_FIELDS.map(([key, label]) => (
                           <label key={key} className="flex flex-col gap-1">
                             <span className="text-[10px] text-white/35">{label}</span>
-                            <input
+                            <ShortcutInput
                               value={form.shortcuts[key]}
-                              onChange={e => field('shortcuts', { ...form.shortcuts, [key]: e.target.value })}
-                              className="input-field text-xs py-2"
+                              onChange={val => field('shortcuts', { ...form.shortcuts, [key]: val })}
                             />
                           </label>
                         ))}
@@ -673,6 +675,29 @@ export default function CreateApp({
                     </label>
                     <p className="text-[11px] text-white/25 mt-1">
                       Hereda la configuración global. Desactiva solo si la app falla con el bloqueador.
+                    </p>
+                  </div>
+
+                  {/* Notificaciones nativas por app */}
+                  <div>
+                    <label className="form-label flex items-center gap-2">
+                      Notificaciones del sistema
+                      <label className="flex items-center gap-1.5 ml-auto cursor-pointer">
+                        <div
+                          onClick={() => field('notificationsEnabled', !form.notificationsEnabled)}
+                          className={`relative w-8 h-4 rounded-full transition-colors ${form.notificationsEnabled ? 'bg-violet-600' : 'bg-white/[0.1]'}`}
+                        >
+                          <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${form.notificationsEnabled ? 'translate-x-4' : ''}`} />
+                        </div>
+                        <span className="text-[11px] text-white/40">
+                          {form.notificationsEnabled ? 'Activadas' : 'Desactivadas'}
+                        </span>
+                      </label>
+                    </label>
+                    <p className="text-[11px] text-white/25 mt-1">
+                      Por defecto están bloqueadas (son el principal vector de spam de avisos falsos).
+                      Actívalas solo para apps de confianza — se mostrarán como notificaciones nativas
+                      del sistema operativo y al hacer clic abrirán la ventana de la app.
                     </p>
                   </div>
 

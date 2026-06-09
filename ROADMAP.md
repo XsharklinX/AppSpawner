@@ -1,5 +1,37 @@
 # AppSpawner Roadmap
 
+## Deuda tecnica: completar adaptacion a modo claro
+
+Fase 1 (hecha en v3.4.x): se crearon los tokens adaptativos `fg` / `overlay` / `line`
+en `tailwind.config.js` (respaldados por `--fg-rgb` / `--overlay-rgb` / `--line-rgb`
+en `index.css`, distintos para `html.dark` y `html.light`) y se migraron las pantallas
+de mayor trafico: `Dashboard.jsx`, `AppCard.jsx`, `Layout/Sidebar.jsx`.
+
+Patron de migracion (repetir por archivo):
+- `text-white/NN` -> `text-fg/NN`, `text-white/[0.0N]` -> `text-fg/[0.0N]`
+- `bg-white/[0.0N]` -> `bg-overlay/[0.0N]`
+- `border-white/[0.0N]` -> `border-line/[0.0N]`
+- `placeholder-white/NN` -> `placeholder-fg/NN`, `divide-white/[..]` -> `divide-line/[..]`
+- NO tocar `text-white` / `bg-white` / `ring-white` / `border-white` SIN slash de opacidad
+  cuando esten sobre fondos de color fijo (botones violeta, badges rojos, logos con
+  gradiente de acento) — esos deben permanecer blancos en ambos temas.
+- Revisar caso a caso los `ring-white/NN` (anillos de seleccion): si el elemento vive
+  sobre una superficie adaptativa (`bg-overlay`/`bg-surface-*`), migrar a `ring-fg/NN`;
+  si vive sobre un color fijo, dejarlo en `white`.
+
+Archivos pendientes de migrar (orden sugerido por uso/visibilidad):
+`CreateApp.jsx`, `Settings/index.jsx`, `Settings/General.jsx`, `Settings/Security.jsx`,
+`Settings/AdBlock.jsx`, `Settings/Backup.jsx`, `Settings/Storage.jsx`, `Settings/About.jsx`,
+`Settings/LinkRules.jsx`, `Settings/Appearance.jsx`, `Profiles.jsx`, `Discover.jsx`,
+`Onboarding.jsx`, `QuickLauncher.jsx`, `SecurityCenter.jsx`, `SessionSnapshots.jsx`,
+`AppCredentials.jsx`, `AppScripts.jsx`, `Downloads.jsx`, `BrowsingHistory.jsx`,
+`Layout/TitleBar.jsx`, `contexts/AppContext.jsx`, `contexts/ToastContext.jsx`,
+`common/Modal.jsx`, `common/Tooltip.jsx`, `common/Menu.jsx`, `common/EmptyState.jsx`,
+`common/Switch.jsx`, `common/ShortcutInput.jsx`, `common/AppIcon.jsx`.
+
+Tras cada tanda de archivos: `npx vite build` + correr la app y alternar
+Settings > Apariencia > tema "Light" vs "Dark" para QA visual antes de continuar.
+
 ## Prioridad alta
 
 - Adblock con listas remotas actualizables: EasyList, EasyPrivacy, uBlock filters, annoyances y listas regionales.

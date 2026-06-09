@@ -1,5 +1,67 @@
 'use strict';
-const { ipcRenderer, contextBridge } = require('electron');
+const { ipcRenderer, contextBridge, webFrame } = require('electron');
+
+// Algunas redes de anuncios (p.ej. "social bars" de Adsterra/PropellerAds que imitan
+// notificaciones de Snapchat/Telegram) renderizan su contenido dentro de un Shadow DOM
+// cerrado específicamente para que los bloqueadores de anuncios no puedan inspeccionarlo
+// ni eliminarlo. Forzamos `attachShadow` a modo "open" en el contexto de la página
+// (main world) para que nuestro escáner de molestias pueda atravesar esos shadow roots.
+function forceOpenShadowDom() {
+  try {
+    webFrame.executeJavaScriptInMainWorld({
+      code: `(() => {
+        if (window.__appSpawnerShadowPatched) return;
+        window.__appSpawnerShadowPatched = true;
+        const orig = Element.prototype.attachShadow;
+        Element.prototype.attachShadow = function(init) {
+          let root;
+          try { root = orig.call(this, { ...init, mode: 'open' }); }
+          catch { root = orig.call(this, init); }
+          // Avisar al preload (mismo DOM, distinto realm de JS) para que vuelva
+          // a escanear este nodo en busca de notificaciones falsas escondidas.
+          try { this.dispatchEvent(new CustomEvent('appspawner:shadow-attached', { bubbles: true, composed: true })); } catch {}
+          return root;
+        };
+      })();`,
+      world: 'main',
+    });
+  } catch {}
+}
+forceOpenShadowDom();
+
+// Cuando el usuario habilita notificaciones para esta app, Electron ya muestra
+// las Notification del navegador como notificaciones nativas del SO — sólo
+// hace falta enganchar el clic para enfocar/restaurar la ventana de la app.
+function bridgeNativeNotifications() {
+  if (window.top !== window.self) return;
+  try {
+    webFrame.executeJavaScriptInMainWorld({
+      code: `(() => {
+        if (window.__appSpawnerNotifPatched || !window.Notification) return;
+        window.__appSpawnerNotifPatched = true;
+        const Original = window.Notification;
+        function Patched(title, options) {
+          const instance = new Original(title, options);
+          try {
+            instance.addEventListener('click', () => {
+              document.dispatchEvent(new CustomEvent('appspawner:notification-click'));
+            });
+          } catch {}
+          return instance;
+        }
+        Patched.prototype = Original.prototype;
+        Patched.permission = Original.permission;
+        Patched.requestPermission = Original.requestPermission.bind(Original);
+        window.Notification = Patched;
+      })();`,
+      world: 'main',
+    });
+  } catch {}
+  document.addEventListener('appspawner:notification-click', () => {
+    ipcRenderer.send('ssb:notification-clicked');
+  });
+}
+bridgeNativeNotifications();
 
 const DEFAULT_CONFIG = {
   version: '3.1.0',
@@ -22,6 +84,11 @@ const DEFAULT_CONFIG = {
     devtools: 'Ctrl+Shift+I',
     pip: 'Ctrl+Shift+P',
   },
+  indicators: {
+    adblock: false,
+    scripts: false,
+    proxy:   false,
+  },
 };
 
 function readConfig() {
@@ -32,9 +99,10 @@ function readConfig() {
     return {
       ...DEFAULT_CONFIG,
       ...parsed,
-      adblock: { ...DEFAULT_CONFIG.adblock, ...(parsed.adblock || {}) },
-      toolbar: { ...DEFAULT_CONFIG.toolbar, ...(parsed.toolbar || {}) },
-      shortcuts: { ...DEFAULT_CONFIG.shortcuts, ...(parsed.shortcuts || {}) },
+      adblock:    { ...DEFAULT_CONFIG.adblock,    ...(parsed.adblock    || {}) },
+      toolbar:    { ...DEFAULT_CONFIG.toolbar,    ...(parsed.toolbar    || {}) },
+      shortcuts:  { ...DEFAULT_CONFIG.shortcuts,  ...(parsed.shortcuts  || {}) },
+      indicators: { ...DEFAULT_CONFIG.indicators, ...(parsed.indicators || {}) },
     };
   } catch {
     return DEFAULT_CONFIG;
@@ -42,6 +110,12 @@ function readConfig() {
 }
 
 const config = readConfig();
+
+// Con nodeIntegrationInSubFrames activo, este preload se ejecuta también dentro de
+// los iframes (incluidos los reproductores de video de terceros, donde suelen vivir
+// los "social bars" de anuncios). Las funciones de UI (toolbar, atajos, badge…) sólo
+// deben actuar en el frame principal; el escaneo de molestias debe correr en todos.
+const isTopFrame = window.top === window.self;
 
 function acceleratorMatches(event, accelerator) {
   if (!accelerator) return false;
@@ -85,7 +159,7 @@ function goHome() {
 }
 
 window.addEventListener('keydown', (event) => {
-  if (config.shortcuts?.enabled === false) return;
+  if (!isTopFrame || config.shortcuts?.enabled === false) return;
   const shortcuts = config.shortcuts || {};
 
   if (acceleratorMatches(event, shortcuts.reload) || acceleratorMatches(event, shortcuts.reloadAlt)) {
@@ -131,13 +205,17 @@ const titleObserver = new MutationObserver(() => {
 
 function toolbarButton(key) {
   const labels = {
-    back: ['M15 18l-6-6 6-6M9 12h12', 'Atras'],
-    forward: ['M9 18l6-6-6-6M3 12h12', 'Adelante'],
-    reload: ['M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6', 'Recargar'],
-    home: ['M3 11l9-8 9 8M5 10v10h14V10', 'Inicio'],
-    pip: ['M4 5h16v14H4zM12 12h6v4h-6z', 'Picture-in-Picture'],
-    notes: ['M5 4h14v16H5zM8 8h8M8 12h8M8 16h5', 'Notas'],
-    devtools: ['M8 9l-4 3 4 3M16 9l4 3-4 3M14 5l-4 14', 'DevTools'],
+    back:     ['M15 18l-6-6 6-6M9 12h12',                       'Atrás'],
+    forward:  ['M9 18l6-6-6-6M3 12h12',                         'Adelante'],
+    reload:   ['M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6',          'Recargar'],
+    home:     ['M3 11l9-8 9 8M5 10v10h14V10',                   'Inicio'],
+    pip:      ['M4 5h16v14H4zM12 12h6v4h-6z',                   'Picture-in-Picture'],
+    notes:    ['M5 4h14v16H5zM8 8h8M8 12h8M8 16h5',             'Notas'],
+    devtools: ['M8 9l-4 3 4 3M16 9l4 3-4 3M14 5l-4 14',         'DevTools'],
+    shield:   ['M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10',    'Ad Block activo'],
+    picker:   ['M4 20h4l10.5-10.5a2 2 0 0 0-4-4L4 16v4',        'Ocultar elemento'],
+    snapshot: ['M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', 'Guardar sesión'],
+    settings: ['M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z', 'Opciones de toolbar'],
   };
   const [pathData, label] = labels[key] || ['', key];
   const button = document.createElement('button');
@@ -149,16 +227,289 @@ function toolbarButton(key) {
     ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${pathData}"/></svg>`
     : `<span>${key}</span>`;
   button.addEventListener('click', () => {
-    if (key === 'back') window.history.back();
-    if (key === 'forward') window.history.forward();
-    if (key === 'reload') window.location.reload();
-    if (key === 'home') goHome();
-    if (key === 'pip') togglePictureInPicture();
-    if (key === 'notes') toggleNotes();
+    if (key === 'back')     window.history.back();
+    if (key === 'forward')  window.history.forward();
+    if (key === 'reload')   window.location.reload();
+    if (key === 'home')     goHome();
+    if (key === 'pip')      togglePictureInPicture();
+    if (key === 'notes')    toggleNotes();
     if (key === 'devtools') ipcRenderer.send('ssb:open-devtools');
+    if (key === 'shield')   ipcRenderer.send('ssb:toggle-adblock');
+    if (key === 'picker')   startElementPicker();
+    if (key === 'snapshot') ipcRenderer.send('ssb:save-snapshot');
+    if (key === 'settings') openToolbarEditor();
   });
   return button;
 }
+
+// ── Toast de feedback ─────────────────────────────────────────────────────────
+
+function showSsbToast(message, type) {
+  if (!document.getElementById('appspawner-toast-anim')) {
+    const s = document.createElement('style');
+    s.id = 'appspawner-toast-anim';
+    s.textContent = `@keyframes as-toast-in{from{opacity:0;transform:translateX(-50%) translateY(6px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}`;
+    document.head.appendChild(s);
+  }
+  const t = document.createElement('div');
+  t.dataset.appspawnerUi = 'true';
+  const col = type === 'error' ? '#ef4444' : '#10b981';
+  const icon = type === 'error' ? '✗' : '✓';
+  t.style.cssText = `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:2147483647;background:rgba(12,12,18,.97);color:#fff;padding:10px 18px;border-radius:12px;font:13px system-ui;border:1px solid ${col}55;box-shadow:0 8px 28px rgba(0,0,0,.45);backdrop-filter:blur(16px);display:flex;align-items:center;gap:9px;white-space:nowrap;animation:as-toast-in .18s ease`;
+  t.innerHTML = `<span style="color:${col};font-size:15px">${icon}</span>${message}`;
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.transition = 'opacity .25s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 260); }, 2500);
+}
+
+// ── Editor de toolbar ─────────────────────────────────────────────────────────
+
+const ALL_TOOLBAR_BUTTONS = [
+  { key: 'back',     label: 'Atrás',    icon: 'M15 18l-6-6 6-6M9 12h12' },
+  { key: 'forward',  label: 'Adelante', icon: 'M9 18l6-6-6-6M3 12h12' },
+  { key: 'reload',   label: 'Recargar', icon: 'M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6' },
+  { key: 'home',     label: 'Inicio',   icon: 'M3 11l9-8 9 8M5 10v10h14V10' },
+  { key: 'pip',      label: 'PiP',      icon: 'M4 5h16v14H4zM12 12h6v4h-6z' },
+  { key: 'notes',    label: 'Notas',    icon: 'M5 4h14v16H5zM8 8h8M8 12h8M8 16h5' },
+  { key: 'devtools', label: 'DevTools', icon: 'M8 9l-4 3 4 3M16 9l4 3-4 3M14 5l-4 14' },
+  { key: 'shield',   label: 'AdBlock',  icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10' },
+  { key: 'picker',   label: 'Ocultar',  icon: 'M4 20h4l10.5-10.5a2 2 0 0 0-4-4L4 16v4' },
+  { key: 'snapshot', label: 'Sesión',   icon: 'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
+];
+
+function rebuildToolbar(newButtons) {
+  const tb = document.getElementById('appspawner-toolbar');
+  if (!tb) return;
+  while (tb.firstChild) tb.removeChild(tb.firstChild);
+  (newButtons || config.toolbar?.buttons || DEFAULT_CONFIG.toolbar.buttons).forEach(key => {
+    if (key !== 'settings') tb.appendChild(toolbarButton(key));
+  });
+  tb.appendChild(toolbarButton('settings'));
+  if (config.toolbar) config.toolbar.buttons = newButtons;
+}
+
+function openToolbarEditor() {
+  const existing = document.getElementById('appspawner-toolbar-editor');
+  if (existing) { existing.remove(); return; }
+
+  const currentButtons = new Set(config.toolbar?.buttons || DEFAULT_CONFIG.toolbar.buttons);
+  const selected = new Set(currentButtons);
+
+  const panel = document.createElement('div');
+  panel.id = 'appspawner-toolbar-editor';
+  panel.dataset.appspawnerUi = 'true';
+  panel.style.cssText = `
+    position:fixed;top:54px;right:12px;z-index:2147483647;
+    background:rgba(12,12,18,.97);border:1px solid rgba(255,255,255,.14);
+    border-radius:14px;padding:12px 10px 10px;
+    box-shadow:0 18px 46px rgba(0,0,0,.45);backdrop-filter:blur(18px);
+    color:white;display:grid;grid-template-columns:repeat(3,1fr);gap:5px;min-width:190px;
+  `;
+
+  ALL_TOOLBAR_BUTTONS.forEach(({ key, label, icon }) => {
+    const on = selected.has(key);
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.dataset.appspawnerUi = 'true';
+    el.dataset.editorKey = key;
+    el.title = label;
+    el.style.cssText = `
+      display:flex;flex-direction:column;align-items:center;gap:3px;
+      padding:8px 5px;border-radius:10px;border:0;cursor:pointer;
+      font:10px system-ui;transition:all .12s;
+      background:${on ? 'rgba(124,58,237,.5)' : 'rgba(255,255,255,.06)'};
+      color:${on ? '#c4b5fd' : 'rgba(255,255,255,.45)'};
+    `;
+    el.innerHTML = `<svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="${icon}"/></svg>${label}`;
+    el.addEventListener('click', () => {
+      if (selected.has(key)) selected.delete(key);
+      else selected.add(key);
+      const active = selected.has(key);
+      el.style.background = active ? 'rgba(124,58,237,.5)' : 'rgba(255,255,255,.06)';
+      el.style.color       = active ? '#c4b5fd' : 'rgba(255,255,255,.45)';
+    });
+    panel.appendChild(el);
+  });
+
+  const apply = document.createElement('button');
+  apply.type = 'button';
+  apply.dataset.appspawnerUi = 'true';
+  apply.textContent = 'Aplicar';
+  apply.style.cssText = `grid-column:1/-1;padding:7px;border:0;border-radius:10px;background:#7c3aed;color:#fff;cursor:pointer;font:700 12px system-ui;margin-top:4px`;
+  apply.addEventListener('click', () => {
+    const ordered = ALL_TOOLBAR_BUTTONS.map(b => b.key).filter(k => selected.has(k));
+    ordered.push('settings');
+    ipcRenderer.send('ssb:update-toolbar-buttons', ordered);
+    panel.remove();
+    rebuildToolbar(ordered);
+    showSsbToast('Toolbar actualizada', 'success');
+  });
+  panel.appendChild(apply);
+  document.body.appendChild(panel);
+
+  let closeEditorHandler;
+  closeEditorHandler = (e) => {
+    if (!isAppSpawnerUi(e.target)) {
+      panel.remove();
+      document.removeEventListener('click', closeEditorHandler, true);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', closeEditorHandler, true), 120);
+}
+
+// ── Element picker ────────────────────────────────────────────────────────────
+
+function startElementPicker() {
+  if (document.getElementById('appspawner-picker-marker')) return;
+
+  const marker = document.createElement('div');
+  marker.id = 'appspawner-picker-marker';
+  marker.dataset.appspawnerUi = 'true';
+  marker.style.display = 'none';
+  document.body.appendChild(marker);
+
+  const style = document.createElement('style');
+  style.id = 'appspawner-picker-style';
+  style.textContent = `
+    #appspawner-picker-highlight {
+      position: fixed; z-index: 2147483646; pointer-events: none;
+      border: 2px solid #7c3aed; background: rgba(124,58,237,0.14);
+      border-radius: 3px; transition: all .05s ease;
+    }
+    #appspawner-picker-tooltip {
+      position: fixed; z-index: 2147483647; pointer-events: none;
+      background: rgba(12,12,18,.94); color: #c4b5fd; padding: 5px 10px;
+      border-radius: 8px; font: 11px/1.4 monospace; white-space: pre;
+      max-width: 440px; overflow: hidden; text-overflow: ellipsis;
+      box-shadow: 0 4px 16px rgba(0,0,0,.45); border: 1px solid rgba(124,58,237,.4);
+    }
+    #appspawner-picker-bar {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      z-index: 2147483647; background: rgba(12,12,18,.94); color: white;
+      padding: 10px 18px; border-radius: 12px; font: 13px system-ui;
+      border: 1px solid rgba(124,58,237,.35); box-shadow: 0 8px 28px rgba(0,0,0,.45);
+      backdrop-filter: blur(16px); text-align: center; white-space: nowrap;
+    }
+    #appspawner-picker-bar kbd {
+      background: rgba(255,255,255,.12); border-radius: 5px;
+      padding: 1px 6px; font: 11px monospace;
+    }
+  `;
+  document.head.appendChild(style);
+
+  const highlight = document.createElement('div');
+  highlight.id = 'appspawner-picker-highlight';
+  highlight.dataset.appspawnerUi = 'true';
+  document.body.appendChild(highlight);
+
+  const tooltip = document.createElement('div');
+  tooltip.id = 'appspawner-picker-tooltip';
+  tooltip.dataset.appspawnerUi = 'true';
+  document.body.appendChild(tooltip);
+
+  const bar = document.createElement('div');
+  bar.id = 'appspawner-picker-bar';
+  bar.dataset.appspawnerUi = 'true';
+  bar.innerHTML = `<strong>Selector de elementos</strong> &mdash; Clic para ocultar &nbsp;&middot;&nbsp; <kbd>Esc</kbd> para cancelar`;
+  document.body.appendChild(bar);
+
+  let lastHovered = null;
+
+  function safeEscape(str) {
+    if (typeof CSS !== 'undefined' && CSS.escape) return CSS.escape(str);
+    return str.replace(/[^\w-]/g, c => `\\${c}`);
+  }
+
+  function generateSelector(el) {
+    const parts = [];
+    let cur = el;
+    while (cur && cur !== document.body && parts.length < 5) {
+      if (cur.id && /^[a-z]/i.test(cur.id)) {
+        parts.unshift(`#${safeEscape(cur.id)}`);
+        break;
+      }
+      const tag = cur.tagName.toLowerCase();
+      const cls = Array.from(cur.classList)
+        .filter(c => !/^(is-|has-|active|hover|focus|selected|disabled|open|show|hide|visible|hidden)/.test(c))
+        .slice(0, 2)
+        .map(c => `.${safeEscape(c)}`).join('');
+      parts.unshift(tag + cls);
+      cur = cur.parentElement;
+    }
+    return parts.length ? parts.join(' > ') : null;
+  }
+
+  function onMouseMove(e) {
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el || isAppSpawnerUi(el)) return;
+    lastHovered = el;
+    const rect = el.getBoundingClientRect();
+    highlight.style.left   = `${rect.left + window.scrollX}px`;
+    highlight.style.top    = `${rect.top  + window.scrollY}px`;
+    highlight.style.width  = `${rect.width}px`;
+    highlight.style.height = `${rect.height}px`;
+    const sel = generateSelector(el);
+    tooltip.textContent = sel || el.tagName.toLowerCase();
+    const tx = Math.min(e.clientX + 14, window.innerWidth - 460);
+    const ty = e.clientY > window.innerHeight - 80 ? e.clientY - 52 : e.clientY + 18;
+    tooltip.style.left    = `${tx}px`;
+    tooltip.style.top     = `${ty}px`;
+    tooltip.style.display = 'block';
+  }
+
+  function onClick(e) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (!lastHovered) return;
+    const sel = generateSelector(lastHovered);
+    if (!sel) return;
+    ipcRenderer.send('ssb:element-picked', { selector: sel, hostname: location.hostname });
+    // Ocultar inmediatamente el elemento en esta sesion
+    try {
+      const styleEl = document.createElement('style');
+      styleEl.dataset.appspawnerUi = 'true';
+      styleEl.textContent = `${sel} { display:none!important; }`;
+      document.head.appendChild(styleEl);
+    } catch {}
+    cleanup();
+  }
+
+  function onKeyDown(e) {
+    if (e.key === 'Escape') cleanup();
+  }
+
+  function cleanup() {
+    document.removeEventListener('mousemove', onMouseMove, true);
+    document.removeEventListener('click',     onClick,     true);
+    document.removeEventListener('keydown',   onKeyDown,   true);
+    highlight.remove(); tooltip.remove(); bar.remove(); marker.remove();
+    document.getElementById('appspawner-picker-style')?.remove();
+  }
+
+  document.addEventListener('mousemove', onMouseMove, true);
+  document.addEventListener('click',     onClick,     true);
+  document.addEventListener('keydown',   onKeyDown,   true);
+}
+
+window.__appSpawnerStartElementPicker = startElementPicker;
+
+// Recibir activacion del picker desde el proceso principal
+ipcRenderer.on('adblock:start-picker', () => startElementPicker());
+
+// Actualizar el boton shield cuando el estado del adblock cambia
+ipcRenderer.on('adblock:status-changed', (_e, { enabled }) => {
+  const btn = document.querySelector('#appspawner-toolbar [data-action="shield"]');
+  if (btn) {
+    btn.title = enabled ? 'Ad Block activo' : 'Ad Block PAUSADO';
+    btn.style.color = enabled ? '' : 'rgba(251,191,36,1)';
+  }
+  const ind = document.querySelector('#appspawner-indicators .as-indicator[title*="Block"]');
+  if (ind) ind.style.background = enabled ? '#7c3aed' : 'rgba(251,191,36,.7)';
+});
+
+// Feedback de snapshot guardado
+ipcRenderer.on('ssb:snapshot-saved', (_e, { name } = {}) => {
+  showSsbToast(`Sesión guardada${name ? ': ' + name : ''}`, 'success');
+});
 
 function injectToolbar() {
   if (!config.toolbar?.enabled || document.getElementById('appspawner-toolbar')) return;
@@ -218,9 +569,23 @@ function injectToolbar() {
       padding: 10px; background: rgba(255,255,255,.075); color: white; font: 13px/1.45 system-ui, sans-serif;
     }
     #appspawner-notes textarea::placeholder { color: rgba(255,255,255,.32); }
+    #appspawner-indicators {
+      position: fixed; top: 52px; right: 12px; z-index: 2147483646;
+      display: flex; gap: 4px; align-items: center; padding: 3px 6px;
+      border-radius: 8px; background: rgba(12,12,18,.82);
+      border: 1px solid rgba(255,255,255,.09);
+      backdrop-filter: blur(12px);
+      opacity: .55; transition: opacity .16s ease;
+    }
+    #appspawner-indicators:hover { opacity: 1; }
+    .as-indicator {
+      width: 6px; height: 6px; border-radius: 50%;
+      cursor: default;
+    }
     @media (max-width: 720px) {
       #appspawner-toolbar { top: auto; right: 10px; bottom: 10px; opacity: .72; }
       #appspawner-notes { top: auto; right: 10px; bottom: 54px; }
+      #appspawner-indicators { top: auto; right: 10px; bottom: 54px; display: none; }
     }
   `;
   document.documentElement.appendChild(style);
@@ -228,8 +593,41 @@ function injectToolbar() {
   const toolbar = document.createElement('div');
   toolbar.id = 'appspawner-toolbar';
   toolbar.dataset.appspawnerUi = 'true';
-  (config.toolbar.buttons || DEFAULT_CONFIG.toolbar.buttons).forEach(key => toolbar.appendChild(toolbarButton(key)));
+  const btnKeys = config.toolbar.buttons || DEFAULT_CONFIG.toolbar.buttons;
+  btnKeys.filter(k => k !== 'settings').forEach(key => toolbar.appendChild(toolbarButton(key)));
+  toolbar.appendChild(toolbarButton('settings'));
   document.body.appendChild(toolbar);
+
+  // Indicadores de estado (adblock / scripts / proxy)
+  const indicators = config.indicators || DEFAULT_CONFIG.indicators;
+  const hasBadge = indicators.adblock || indicators.scripts || indicators.proxy;
+  if (hasBadge) {
+    const indBar = document.createElement('div');
+    indBar.id = 'appspawner-indicators';
+    indBar.dataset.appspawnerUi = 'true';
+    if (indicators.adblock) {
+      const d = document.createElement('span');
+      d.className = 'as-indicator';
+      d.title = 'Ad Block activo';
+      d.style.background = '#7c3aed';
+      indBar.appendChild(d);
+    }
+    if (indicators.scripts) {
+      const d = document.createElement('span');
+      d.className = 'as-indicator';
+      d.title = 'Scripts de usuario activos';
+      d.style.background = '#10b981';
+      indBar.appendChild(d);
+    }
+    if (indicators.proxy) {
+      const d = document.createElement('span');
+      d.className = 'as-indicator';
+      d.title = 'Proxy activo';
+      d.style.background = '#3b82f6';
+      indBar.appendChild(d);
+    }
+    document.body.appendChild(indBar);
+  }
 
   const notes = document.createElement('div');
   notes.id = 'appspawner-notes';
@@ -269,6 +667,14 @@ const FAKE_NOTIFICATION_TERMS = [
   'pending snaps', 'snapchat', 'whatsapp', 'telegram', 'notification',
   'notifications', 'new message', 'you have', 'dating', 'adult', 'casino',
   'winner', 'prize', 'claim now', 'click allow', 'enable notifications',
+  'instagram', 'tiktok', 'facebook', 'messenger', 'unread messages',
+  'new follower', 'sent you', 'liked your',
+];
+
+const CLICKBAIT_TERMS = [
+  'going viral', 'trick is going', 'won\'t believe', 'shocking', 'people are sharing',
+  'act now', 'limited time', 'click here', 'find out why', 'doctors hate',
+  'this simple', 'one weird', 'you need to see', 'this will',
 ];
 
 function isInsideMediaSurface(node) {
@@ -300,10 +706,54 @@ function isFloatingOverlay(node) {
 function looksLikeFakeNotification(node) {
   if (!isFloatingOverlay(node)) return false;
   const text = elementText(node);
-  if (!text || text.length > 260) return false;
-  const termHit = FAKE_NOTIFICATION_TERMS.some(term => text.includes(term));
+  if (!text || text.length > 500) return false;
+
+  const termHit      = FAKE_NOTIFICATION_TERMS.some(term => text.includes(term));
+  const clickbaitHit = CLICKBAIT_TERMS.some(term => text.includes(term));
   const hasBadgeNumber = /\(\d+\)|\b\d+\s+(messages?|snaps?|notifications?)\b/i.test(text);
-  return (termHit || hasBadgeNumber) && hasCloseControl(node);
+
+  if (termHit || hasBadgeNumber) return true;
+  if (clickbaitHit && hasCloseControl(node)) return true;
+  return false;
+}
+
+// Detecta widgets de notificación ad posicionados en esquinas (z-index puede ser bajo)
+function isTopCornerNotification(node) {
+  if (!(node instanceof Element) || isAppSpawnerUi(node) || isInsideMediaSurface(node)) return false;
+  const style = getComputedStyle(node);
+  if (!['fixed', 'absolute'].includes(style.position)) return false;
+  const rect = node.getBoundingClientRect();
+  if (rect.width < 140 || rect.width > 460) return false;
+  if (rect.height < 48 || rect.height > 220) return false;
+  if (rect.top < 0 || rect.top > 420) return false;
+  // Debe estar en un lateral (>50% del ancho desde algún borde)
+  const nearRight = rect.right > window.innerWidth * 0.5;
+  const nearLeft  = rect.left  < window.innerWidth * 0.5;
+  if (!nearRight && !nearLeft) return false;
+  const text = elementText(node);
+  if (!text || text.length > 600) return false;
+  return (
+    FAKE_NOTIFICATION_TERMS.some(t => text.includes(t)) ||
+    CLICKBAIT_TERMS.some(t => text.includes(t)) ||
+    /\(\d+\)|\b\d+\s+(messages?|snaps?|notifications?|unread)\b/i.test(text)
+  );
+}
+
+function injectAntiNotificationCss() {
+  if (document.getElementById('as-anti-notif-css')) return;
+  const style = document.createElement('style');
+  style.id = 'as-anti-notif-css';
+  style.dataset.appspawnerUi = 'true';
+  style.textContent = `
+    [id*="onesignal" i]:not([data-appspawner-ui]),
+    [class*="push-notif" i]:not([data-appspawner-ui]),
+    [class*="notification-widget" i]:not([data-appspawner-ui]),
+    [class*="notif-popup" i]:not([data-appspawner-ui]),
+    [id*="notif-banner" i]:not([data-appspawner-ui]),
+    [id*="push-banner" i]:not([data-appspawner-ui]),
+    [class*="pushNotif" i]:not([data-appspawner-ui]) { display: none !important; }
+  `;
+  (document.head || document.documentElement).appendChild(style);
 }
 
 function overlaysVideo(node) {
@@ -329,15 +779,31 @@ function isAppSpawnerUi(node) {
   return node instanceof Element && (node.dataset.appspawnerUi === 'true' || Boolean(node.closest('[data-appspawner-ui="true"]')));
 }
 
+// Recorre un árbol incluyendo shadow roots (abiertos gracias a forceOpenShadowDom,
+// o ya abiertos de origen) — los "social bars" de anuncios suelen esconder ahí
+// sus notificaciones falsas para evadir los escáneres de DOM convencionales.
+function collectDeepElements(root) {
+  const out = [];
+  const stack = [root];
+  while (stack.length) {
+    const node = stack.pop();
+    if (!(node instanceof Element || node instanceof ShadowRoot)) continue;
+    if (node instanceof Element) out.push(node);
+    if (node.shadowRoot) stack.push(node.shadowRoot);
+    for (const child of node.children || []) stack.push(child);
+  }
+  return out;
+}
+
 function scanAnnoyances(root = document) {
   if (!config.adblock?.enabled || !config.adblock?.annoyances) return;
   const nodes = root instanceof Element
-    ? [root, ...root.querySelectorAll('body *')]
-    : Array.from(document.querySelectorAll('body *'));
+    ? collectDeepElements(root)
+    : collectDeepElements(document.body || document.documentElement);
 
   for (const node of nodes) {
     if (!(node instanceof Element) || isAppSpawnerUi(node)) continue;
-    if (looksLikeFakeNotification(node)) {
+    if (looksLikeFakeNotification(node) || isTopCornerNotification(node)) {
       node.remove();
       continue;
     }
@@ -348,13 +814,21 @@ function scanAnnoyances(root = document) {
   }
 }
 
+function runAnnoyanceSweep() {
+  // Escaneo escalonado para capturar elementos que se insertan con delay
+  scanAnnoyances();
+  setTimeout(() => scanAnnoyances(), 600);
+  setTimeout(() => scanAnnoyances(), 1800);
+}
+
 function installAntiAnnoyanceGuard() {
   if (!config.adblock?.enabled || !config.adblock?.annoyances || window.__appSpawnerAntiAnnoyanceInstalled) return;
   window.__appSpawnerAntiAnnoyanceInstalled = true;
-  const run = () => scanAnnoyances();
-  setTimeout(run, 250);
-  setTimeout(run, 1000);
-  setTimeout(run, 2500);
+
+  injectAntiNotificationCss();
+  runAnnoyanceSweep();
+  setTimeout(() => scanAnnoyances(), 4000);
+
   const observer = new MutationObserver(mutations => {
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
@@ -367,27 +841,53 @@ function installAntiAnnoyanceGuard() {
   };
   if (document.body) startObserver();
   else document.addEventListener('DOMContentLoaded', startObserver, { once: true });
+
+  // Cuando una página adjunta un shadow root (forzado a "open" por forceOpenShadowDom),
+  // re-escaneamos ese nodo: ahí es donde los "social bars" de anuncios esconden
+  // sus notificaciones falsas de Snapchat/Telegram para evadir el escáner normal.
+  document.addEventListener('appspawner:shadow-attached', (e) => {
+    const host = e.target;
+    if (host instanceof Element) {
+      scanAnnoyances(host);
+      setTimeout(() => scanAnnoyances(host), 400);
+    }
+  }, true);
+
+  // Interceptar navegación SPA (pushState / replaceState) para volver a escanear
+  // cuando el router de la app cambia de ruta sin recargar la página
+  if (!window.__appSpawnerSpaHooked) {
+    window.__appSpawnerSpaHooked = true;
+    const _origPush    = history.pushState.bind(history);
+    const _origReplace = history.replaceState.bind(history);
+    history.pushState    = function(...args) { _origPush(...args);    runAnnoyanceSweep(); };
+    history.replaceState = function(...args) { _origReplace(...args); runAnnoyanceSweep(); };
+    window.addEventListener('popstate', runAnnoyanceSweep);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  if (document.head) {
-    titleObserver.observe(document.head, { childList: true, subtree: true, characterData: true });
+  if (isTopFrame) {
+    if (document.head) {
+      titleObserver.observe(document.head, { childList: true, subtree: true, characterData: true });
+    }
+    const count = extractBadgeCount(document.title);
+    if (count > 0) ipcRenderer.send('ssb:badge-update', count);
+    document.documentElement.style.scrollBehavior = 'smooth';
+    injectToolbar();
   }
-  const count = extractBadgeCount(document.title);
-  if (count > 0) ipcRenderer.send('ssb:badge-update', count);
-  document.documentElement.style.scrollBehavior = 'smooth';
-  injectToolbar();
   installAntiAnnoyanceGuard();
 });
 
 installAntiAnnoyanceGuard();
 
-contextBridge.exposeInMainWorld('appSpawner', {
-  isSSB: true,
-  version: '3.1.0',
-  goBack: () => window.history.back(),
-  goForward: () => window.history.forward(),
-  reload: () => window.location.reload(),
-  goHome,
-  togglePictureInPicture,
-});
+if (isTopFrame) {
+  contextBridge.exposeInMainWorld('appSpawner', {
+    isSSB: true,
+    version: '3.1.0',
+    goBack: () => window.history.back(),
+    goForward: () => window.history.forward(),
+    reload: () => window.location.reload(),
+    goHome,
+    togglePictureInPicture,
+  });
+}

@@ -92,21 +92,36 @@ async function _win32Create(appConfig, type) {
 
     const shortcutPath = path.join(targetDir, `${appConfig.name}.lnk`);
     const IS_DEV = !app.isPackaged;
-    // En dev, electron.exe necesita la ruta del proyecto como primer argumento
-    const args = IS_DEV
-      ? `"${app.getAppPath()}" --launch-app=${appConfig.id}`
-      : `--launch-app=${appConfig.id}`;
-
     const iconPaths = await ensureAppIcon(appConfig);
     const operation = fs.existsSync(shortcutPath) ? 'replace' : 'create';
+
+    let target, args;
+    if (IS_DEV) {
+      // En dev, electron.exe es una app de consola: al lanzarse desde un .lnk
+      // Windows abre una ventana CMD visible. Se usa wscript.exe + VBS con windowStyle=0
+      // para lanzar electron sin mostrar ninguna ventana de consola.
+      const launcherDir = path.join(app.getPath('userData'), 'launchers');
+      fs.mkdirSync(launcherDir, { recursive: true });
+      const vbsPath  = path.join(launcherDir, `${appConfig.id}.vbs`);
+      const exePath  = process.execPath.replace(/"/g, '""');
+      const projPath = app.getAppPath().replace(/"/g, '""');
+      const vbsContent = `CreateObject("WScript.Shell").Run """${exePath}"" ""${projPath}"" --launch-app=${appConfig.id}", 0, False\r\n`;
+      fs.writeFileSync(vbsPath, vbsContent, 'utf8');
+      target = 'wscript.exe';
+      args   = `"${vbsPath}"`;
+    } else {
+      target = process.execPath;
+      args   = `--launch-app=${appConfig.id}`;
+    }
+
     const success = shell.writeShortcutLink(shortcutPath, operation, {
-      target:          process.execPath,
+      target,
       args,
-      description:     `Abrir ${appConfig.name} en AppSpawner`,
-      icon:            iconPaths.ico,
-      iconIndex:       0,
+      description:      `Abrir ${appConfig.name} en AppSpawner`,
+      icon:             iconPaths.ico,
+      iconIndex:        0,
       workingDirectory: path.dirname(process.execPath),
-      appUserModelId:  `com.appspawner.app.${appConfig.id}`,
+      appUserModelId:   `com.appspawner.app.${appConfig.id}`,
     });
 
     return { success, path: shortcutPath, icon: iconPaths.ico, operation };
@@ -119,6 +134,7 @@ function _win32Remove(appConfig) {
   const targets = [
     path.join(app.getPath('desktop'), `${appConfig.name}.lnk`),
     path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', `${appConfig.name}.lnk`),
+    path.join(app.getPath('userData'), 'launchers', `${appConfig.id}.vbs`),
   ];
   targets.forEach(p => { try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch {} });
 }

@@ -7,12 +7,15 @@ import { WorkspaceProvider }   from './contexts/WorkspaceContext';
 import Sidebar            from './components/Layout/Sidebar';
 import TitleBar           from './components/Layout/TitleBar';
 import QuickLauncher      from './components/QuickLauncher';
+import Downloads          from './components/Downloads';
+import BrowsingHistory    from './components/BrowsingHistory';
 import Onboarding         from './views/Onboarding';
 import Dashboard          from './views/Dashboard';
 import Discover           from './views/Discover';
 import CreateApp          from './views/CreateApp';
 import Settings           from './views/Settings';
 import Profiles           from './views/Profiles';
+import AppTools           from './views/AppTools';
 
 /** Spinner de carga inicial mientras se consulta el user del store */
 function LoadingScreen() {
@@ -34,8 +37,18 @@ function LoadingScreen() {
 /** Renderiza la vista actual según la navegación */
 function AppShell({ currentView, setCurrentView, selectedCategory, setSelectedCategory }) {
   const [showQL,             setShowQL]             = useState(false);
+  const [showDownloads,      setShowDownloads]      = useState(false);
+  const [showHistory,        setShowHistory]        = useState(false);
   const [selectedWorkspace,  setSelectedWorkspace]  = useState(null);
   const [installPrefill,     setInstallPrefill]     = useState(null);
+  const [toolsApp,           setToolsApp]           = useState(null);
+  const [toolsSection,       setToolsSection]       = useState('scripts');
+
+  const openTools = (app, section = 'scripts') => {
+    setToolsApp(app);
+    setToolsSection(section);
+    setCurrentView('app-tools');
+  };
 
   useEffect(() => {
     const u1 = window.electronAPI?.onQuickLauncherToggle?.(() => setShowQL(v => !v));
@@ -54,18 +67,27 @@ function AppShell({ currentView, setCurrentView, selectedCategory, setSelectedCa
           selectedWorkspace={selectedWorkspace}
           onSelectWorkspace={setSelectedWorkspace}
           onNavigate={setCurrentView}
+          onOpenTools={openTools}
         />
       );
       case 'discover':  return <Discover onNavigate={setCurrentView} />;
       case 'create':    return <CreateApp onNavigate={(v) => { setInstallPrefill(null); setCurrentView(v); }} initialData={installPrefill} />;
       case 'settings':  return <Settings />;
       case 'profiles':  return <Profiles onNavigate={setCurrentView} />;
+      case 'app-tools': return (
+        <AppTools
+          app={toolsApp}
+          initialSection={toolsSection}
+          onBack={() => { setToolsApp(null); setCurrentView('dashboard'); }}
+        />
+      );
       default:          return (
         <Dashboard
           selectedCategory={selectedCategory}
           selectedWorkspace={selectedWorkspace}
           onSelectWorkspace={setSelectedWorkspace}
           onNavigate={setCurrentView}
+          onOpenTools={openTools}
         />
       );
     }
@@ -84,6 +106,8 @@ function AppShell({ currentView, setCurrentView, selectedCategory, setSelectedCa
             onCategoryChange={setSelectedCategory}
             selectedWorkspace={selectedWorkspace}
             onSelectWorkspace={setSelectedWorkspace}
+            onOpenDownloads={() => setShowDownloads(true)}
+            onOpenHistory={() => setShowHistory(true)}
           />
           <main className="flex-1 overflow-hidden relative">
             {/* Fondo ambiental */}
@@ -96,7 +120,9 @@ function AppShell({ currentView, setCurrentView, selectedCategory, setSelectedCa
             </div>
           </main>
         </div>
-        {showQL && <QuickLauncher onClose={() => setShowQL(false)} />}
+        {showQL && <QuickLauncher onClose={() => setShowQL(false)} onNavigate={(v) => { setShowQL(false); setCurrentView(v); }} />}
+        {showDownloads && <Downloads onClose={() => setShowDownloads(false)} />}
+        {showHistory && <BrowsingHistory onClose={() => setShowHistory(false)} />}
       </div>
       </WorkspaceProvider>
     </AppProvider>

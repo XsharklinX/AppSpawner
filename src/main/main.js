@@ -16,8 +16,8 @@
 
 const {
   app, BrowserWindow, ipcMain, shell, dialog,
-  Menu, Tray, nativeImage, globalShortcut,
-  session: electronSession,
+  Menu, Tray, nativeImage, globalShortcut, clipboard,
+  session: electronSession, screen,
 } = require('electron');
 const path = require('path');
 const url  = require('url');
@@ -25,14 +25,17 @@ const fs   = require('fs');
 const crypto = require('crypto');
 
 const store  = require('./store');
-const { registerAppManagerHandlers } = require('./ipc/app-manager');
+const { registerAppManagerHandlers, getSessionSize } = require('./ipc/app-manager');
+const { registerDiagnosticsHandlers, recordLoadError, recordPermission } = require('./ipc/diagnostics');
 const { registerShortcutHandlers }   = require('./ipc/shortcuts');
 const { registerWorkspaceHandlers }  = require('./ipc/workspaces');
 const { registerSessionHandlers }    = require('./ipc/sessions');
 const { registerScriptHandlers, readScripts } = require('./ipc/scripts');
 const { registerCredentialHandlers } = require('./ipc/credentials');
 const { registerTotpHandlers }       = require('./ipc/totp');
-const { registerAdBlockHandlers, applyAdBlockToSession, getCosmeticCssForUrl } = require('./ipc/adblock');
+const { registerAdBlockHandlers, applyAdBlockToSession, getCosmeticCssForUrl, isBlockedDomain } = require('./ipc/adblock');
+const { attachDownloadInterceptor, registerDownloadHandlers } = require('./ipc/downloads');
+const { recordNavigation, registerHistoryHandlers } = require('./ipc/history');
 const { v4: uuidv4 }                 = require('uuid');
 const { ensureAppIcon }              = require('./icon-utils');
 
@@ -41,6 +44,19 @@ const { ensureAppIcon }              = require('./icon-utils');
 const IS_DEV = !app.isPackaged;
 const IS_MAC = process.platform === 'darwin';
 const IS_WIN = process.platform === 'win32';
+
+// Dominios de OAuth/auth que deben navegar dentro del SSB (no abrirse en navegador externo)
+const AUTH_DOMAINS = [
+  'accounts.google.com',
+  'oauth2.googleapis.com',
+  'login.microsoftonline.com',
+  'login.live.com',
+  'login.windows.net',
+  'appleid.apple.com',
+];
+function isAuthDomain(hostname) {
+  return AUTH_DOMAINS.some(d => hostname === d || hostname.endsWith('.' + d));
+}
 const PORTABLE_ROOT = app.isPackaged ? path.dirname(process.execPath) : process.cwd();
 const PORTABLE_MARKER = path.join(PORTABLE_ROOT, 'portable.flag');
 const PORTABLE_DATA_DIR = path.join(PORTABLE_ROOT, 'AppSpawnerData');
@@ -79,17 +95,28 @@ function getRendererUrl() {
 
 // ── System Tray ───────────────────────────────────────────────────────────────
 
+function getTrayIconForApp(appConfig) {
+  try {
+    const dir = path.join(app.getPath('userData'), 'app-icons');
+    if (!fs.existsSync(dir)) return undefined;
+    const match = fs.readdirSync(dir).find(f => f.includes(`-${appConfig.id}-`) && f.endsWith('.png'));
+    if (!match) return undefined;
+    const img = nativeImage.createFromPath(path.join(dir, match));
+    return img && !img.isEmpty() ? img.resize({ width: 16, height: 16 }) : undefined;
+  } catch { return undefined; }
+}
+
 function buildTrayMenu() {
   const data = store.read();
   const recent = [...data.apps]
     .sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0))
-    .slice(0, 10); // Máximo 10 apps en el tray
+    .slice(0, 10);
 
   const appItems = recent.length > 0
-    ? recent.map(a => ({
-        label: a.name,
-        click: () => createAppWindow(a),
-      }))
+    ? recent.map(a => {
+        const icon = getTrayIconForApp(a);
+        return { label: a.name, ...(icon ? { icon } : {}), click: () => createAppWindow(a) };
+      })
     : [{ label: 'Sin apps instaladas', enabled: false }];
 
   return Menu.buildFromTemplate([
@@ -608,15 +635,22 @@ function createAppWindow(appConfig, options = {}) {
     return existing;
   }
 
+  const { settings: _initSettings } = store.read();
+  const _initScripts = readScripts(id);
   const ssbRuntimeConfig = {
     version: app.getVersion(),
     homeUrl: appUrl,
     toolbar: appConfig.toolbar || {},
     shortcuts: appConfig.shortcuts || {},
     adblock: {
-      enabled: (store.read().settings.adblockEnabled ?? true) && (appConfig.adblockEnabled ?? true),
-      annoyances: store.read().settings.adblockAnnoyances ?? true,
-      cosmetic: store.read().settings.adblockCosmetic ?? true,
+      enabled: (_initSettings.adblockEnabled ?? true) && (appConfig.adblockEnabled ?? true),
+      annoyances: _initSettings.adblockAnnoyances ?? true,
+      cosmetic: _initSettings.adblockCosmetic ?? true,
+    },
+    indicators: {
+      adblock: (_initSettings.adblockEnabled ?? true) && (appConfig.adblockEnabled ?? true),
+      scripts: (_initScripts?.enabled !== false) && !!(_initScripts?.css?.trim() || _initScripts?.js?.trim()),
+      proxy:   !!(appConfig.proxy?.enabled && appConfig.proxy?.host),
     },
   };
 
@@ -634,6 +668,11 @@ function createAppWindow(appConfig, options = {}) {
       contextIsolation: true,
       webSecurity:      true,
       sandbox:          false,
+      // Inyectar el preload también en iframes (incl. cross-origin): los reproductores
+      // de video embebidos de terceros son donde suelen vivir los "social bars" de
+      // anuncios (notificaciones falsas de Snapchat/Telegram), invisibles para el
+      // escáner de molestias si sólo corre en el frame principal.
+      nodeIntegrationInSubFrames: true,
       // Preload de navegación SSB
       preload:          path.join(__dirname, 'ssb-preload.js'),
       additionalArguments: [
@@ -672,9 +711,44 @@ function createAppWindow(appConfig, options = {}) {
     })
     .catch(() => {});
 
-  // Bloquear popups y ventanas nuevas (window.open, target="_blank") — evita que los anuncios
-  // abran el navegador del sistema. Los links de navegación real se gestionan en will-navigate.
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  // Bloquear popups y ventanas nuevas. Excepción: dominios de OAuth/auth (Google, Microsoft…)
+  // se abren como ventana hija de Electron para mantener la sesión del SSB.
+  // Anti-popunder: las páginas de streaming/anime suelen disparar window.open() hacia
+  // redes de anuncios con cualquier clic (incluido "play" en el video) — esos destinos
+  // se descartan en silencio en lugar de mandarse al navegador externo, y limitamos
+  // la frecuencia de aperturas externas para frenar ráfagas encadenadas.
+  let lastExternalPopupAt = 0;
+  win.webContents.setWindowOpenHandler(({ url: targetUrl }) => {
+    try {
+      const u = new URL(targetUrl);
+      if (isAuthDomain(u.hostname)) {
+        return {
+          action: 'allow',
+          overrideBrowserWindowOptions: {
+            width: 500, height: 660,
+            parent: win,
+            modal: false,
+            autoHideMenuBar: true,
+            backgroundColor: '#ffffff',
+            webPreferences: {
+              partition:        `persist:app_${id}`,
+              nodeIntegration:  false,
+              contextIsolation: true,
+              webSecurity:      true,
+            },
+          },
+        };
+      }
+      if (isBlockedDomain(targetUrl)) return { action: 'deny' };
+    } catch {}
+    if (/^https?:\/\//i.test(targetUrl)) {
+      const now = Date.now();
+      if (now - lastExternalPopupAt < 1500) return { action: 'deny' };
+      lastExternalPopupAt = now;
+      shell.openExternal(targetUrl);
+    }
+    return { action: 'deny' };
+  });
 
   // Navegación en la misma ventana: si el usuario va a otro dominio, abrir en navegador externo.
   // Excepción: rutas de OAuth/auth del mismo dominio raíz (accounts.google.com, etc.) se dejan pasar
@@ -691,7 +765,15 @@ function createAppWindow(appConfig, options = {}) {
       // Mismo dominio raíz → dejar pasar (navegación normal dentro de la app)
       const rootDomain = h => h.split('.').slice(-2).join('.');
       if (rootDomain(nav.hostname) === rootDomain(orig.hostname)) return;
-      // Dominio diferente → abrir en navegador externo (link en el que el usuario hizo clic)
+      // Dominios de OAuth/auth → navegar dentro del SSB para no romper el flujo de login
+      if (isAuthDomain(nav.hostname)) return;
+      // Dominio de ad/tracker conocido → bloquear silenciosamente (no abrir navegador externo)
+      // Esto evita que anuncios de video/popup redirijan al browser del sistema
+      if (isBlockedDomain(navUrl)) {
+        event.preventDefault();
+        return;
+      }
+      // Dominio diferente desconocido → abrir en navegador externo (link del usuario)
       event.preventDefault();
       shell.openExternal(navUrl);
     } catch {
@@ -702,20 +784,36 @@ function createAppWindow(appConfig, options = {}) {
   // Ad Blocker: configurar interceptor en la sesión de esta app
   {
     const { settings } = store.read();
-    const globalEnabled  = settings.adblockEnabled  ?? true;
-    const globalCosmetic = settings.adblockCosmetic  ?? true;
+    const globalEnabled    = settings.adblockEnabled    ?? true;
+    const globalCosmetic   = settings.adblockCosmetic   ?? true;
     const globalAggressive = settings.adblockAggressive ?? true;
     const globalAnnoyances = settings.adblockAnnoyances ?? true;
-    const appEnabled     = appConfig.adblockEnabled  ?? true;
-    const customRules    = appConfig.adblockCustomRules ?? [];
-    const shouldBlock    = globalEnabled && appEnabled;
-    const sess           = electronSession.fromPartition(`persist:app_${id}`);
+    const appEnabled         = appConfig.adblockEnabled         ?? true;
+    const customRules        = appConfig.adblockCustomRules      ?? [];
+    const cosmeticRules      = appConfig.adblockCosmeticRules    ?? [];
+    const filterCategories   = appConfig.adblockFilterCategories ?? null;
+    const aggressiveOverride = appConfig.adblockAggressiveOverride ?? null;
+    const effectiveAggressive = aggressiveOverride !== null && aggressiveOverride !== undefined
+      ? aggressiveOverride
+      : globalAggressive;
+    const shouldBlock = globalEnabled && appEnabled;
+    const sess        = electronSession.fromPartition(`persist:app_${id}`);
     applyAdBlockToSession(sess, id, {
       enabled: shouldBlock,
       customRules,
-      aggressive: globalAggressive,
+      aggressive: effectiveAggressive,
       annoyances: globalAnnoyances,
+      filterCategories,
+      // Las notificaciones del navegador están bloqueadas por defecto (son el principal
+      // vector de spam de "social bars"); el usuario puede habilitarlas por app para
+      // recibir avisos nativos del SO de apps de confianza (correo, chat, etc.)
+      notificationsAllowed: appConfig.notificationsEnabled === true,
+      onPermissionRequest: (permission, granted) => recordPermission(id, permission, granted),
     });
+
+    // Gestor de descargas central: captura las descargas de esta app y las
+    // reporta al dashboard para verlas/abrirlas todas en un único panel.
+    attachDownloadInterceptor(sess, id, name, () => mainWindow);
 
     // HTTPS upgrade: redirigir http → https para peticiones de subrecursos
     if (settings.adblockHttpsUpgrade ?? true) {
@@ -731,21 +829,40 @@ function createAppWindow(appConfig, options = {}) {
       });
     }
 
-    // Cosmetic CSS (ocultar banners de cookie, contenedores de ads)
+    // Cosmetic CSS (ocultar banners de cookie, contenedores de ads, segun categorias)
     if (shouldBlock && globalCosmetic) {
       const injectCosmeticCss = async () => {
         try {
           const pageUrl = win.webContents.getURL() || appUrl;
-          await win.webContents.insertCSS(getCosmeticCssForUrl(pageUrl));
+          await win.webContents.insertCSS(getCosmeticCssForUrl(pageUrl, filterCategories, cosmeticRules));
         } catch {}
       };
-      win.webContents.on('did-finish-load', async () => {
-        await injectCosmeticCss();
-      });
-      win.webContents.on('dom-ready', async () => {
-        await injectCosmeticCss();
-      });
+      win.webContents.on('did-finish-load', async () => { await injectCosmeticCss(); });
+      win.webContents.on('dom-ready',       async () => { await injectCosmeticCss(); });
+      // Re-inyectar en SPAs cuando el router cambia de ruta (React Router, Vue Router, etc.)
+      win.webContents.on('did-navigate-in-page', async () => { await injectCosmeticCss(); });
     }
+
+    // Historial de navegación centralizado: cada cambio de URL dentro de la app
+    // se guarda para verlo luego en el panel de historial del dashboard.
+    const recordHistoryEntry = () => {
+      try { recordNavigation(id, name, win.webContents.getURL(), win.webContents.getTitle()); } catch {}
+    };
+    win.webContents.on('did-navigate', recordHistoryEntry);
+    win.webContents.on('did-navigate-in-page', recordHistoryEntry);
+    win.webContents.on('page-title-updated', recordHistoryEntry);
+
+    // Detectar pagina rota: registrar el error para el panel de diagnostico y,
+    // si el adblock esta activo, avisar tambien al dashboard (puede ser el causante)
+    win.webContents.on('did-fail-load', (_ev, errorCode, errorDesc, validatedURL, isMainFrame) => {
+      if (!isMainFrame || errorCode === -3) return; // -3 = ERR_ABORTED (navegacion usuario)
+      recordLoadError(id, { url: validatedURL, errorCode, errorDesc });
+      if (shouldBlock) {
+        mainWindow?.webContents.send('adblock:page-broken', {
+          appId: id, appName: name, url: validatedURL, errorCode, errorDesc,
+        });
+      }
+    });
   }
 
   // Proxy por app (antes de cargar la URL)
@@ -756,7 +873,84 @@ function createAppWindow(appConfig, options = {}) {
       .catch(err => console.error(`[Proxy] ${name}:`, err.message));
   }
 
-  win.loadURL(appUrl);
+  win.loadURL(options.navigateTo || appUrl);
+
+  // Menú contextual profesional
+  win.webContents.on('context-menu', (_ev, params) => {
+    const items = [];
+
+    items.push({ label: 'Atrás',    enabled: params.canGoBack,    click: () => win.webContents.goBack() });
+    items.push({ label: 'Adelante', enabled: params.canGoForward, click: () => win.webContents.goForward() });
+    items.push({ label: 'Recargar', click: () => win.webContents.reload() });
+    items.push({ type: 'separator' });
+
+    if (params.linkURL) {
+      items.push({ label: 'Abrir enlace en navegador', click: () => shell.openExternal(params.linkURL) });
+      items.push({ label: 'Copiar enlace', click: () => clipboard.writeText(params.linkURL) });
+      items.push({ type: 'separator' });
+    }
+
+    if (params.selectionText?.trim()) {
+      items.push({ label: 'Copiar texto', role: 'copy' });
+      items.push({ type: 'separator' });
+    }
+
+    if (params.mediaType === 'image' && params.srcURL) {
+      items.push({ label: 'Guardar imagen como…', click: () => win.webContents.downloadURL(params.srcURL) });
+      items.push({ type: 'separator' });
+    }
+
+    items.push({ label: 'Abrir en navegador externo', click: () => shell.openExternal(win.webContents.getURL()) });
+    items.push({ label: 'Copiar URL actual', click: () => clipboard.writeText(win.webContents.getURL()) });
+    items.push({ type: 'separator' });
+
+    const { settings: ctxSettings } = store.read();
+    const ctxApp = store.read().apps.find(a => a.id === id) || appConfig;
+    const adblockOn = (ctxSettings.adblockEnabled ?? true) && (ctxApp.adblockEnabled ?? true);
+
+    items.push({
+      label: adblockOn ? 'Pausar Ad Block' : 'Reanudar Ad Block',
+      click: () => {
+        const d = store.read();
+        const idx = d.apps.findIndex(a => a.id === id);
+        if (idx === -1) return;
+        d.apps[idx].adblockEnabled = !(d.apps[idx].adblockEnabled ?? true);
+        store.write(d);
+        const { settings: s } = store.read();
+        applyAdBlockToSession(electronSession.fromPartition(`persist:app_${id}`), id, {
+          enabled: (s.adblockEnabled ?? true) && d.apps[idx].adblockEnabled,
+          customRules: d.apps[idx].adblockCustomRules || [],
+          aggressive:  d.apps[idx].adblockAggressiveOverride ?? (s.adblockAggressive ?? true),
+          annoyances:  s.adblockAnnoyances ?? true,
+          filterCategories: d.apps[idx].adblockFilterCategories ?? null,
+          onPermissionRequest: (permission, granted) => recordPermission(id, permission, granted),
+        });
+        const enabled = d.apps[idx].adblockEnabled;
+        if (!win.isDestroyed()) win.webContents.send('adblock:status-changed', { enabled });
+        mainWindow?.webContents.send('adblock:app-toggled', { appId: id, enabled });
+        if (enabled) win.webContents.reload();
+      },
+    });
+
+    items.push({
+      label: 'Guardar sesión ahora',
+      click: async () => {
+        try {
+          const cookies = await electronSession.fromPartition(`persist:app_${id}`).cookies.get({});
+          const snapshot = { id: uuidv4(), name: `Sesión ${new Date().toLocaleString('es')}`, savedAt: Date.now(), cookies };
+          const dir = path.join(app.getPath('userData'), 'session-snapshots', id);
+          fs.mkdirSync(dir, { recursive: true });
+          fs.writeFileSync(path.join(dir, `${snapshot.id}.json`), JSON.stringify(snapshot));
+          if (!win.isDestroyed()) win.webContents.send('ssb:snapshot-saved', { name: snapshot.name });
+        } catch (err) { console.error('[ContextMenu:Snapshot]', err.message); }
+      },
+    });
+
+    items.push({ type: 'separator' });
+    items.push({ label: 'Herramientas de desarrollo', click: () => win.webContents.openDevTools() });
+
+    Menu.buildFromTemplate(items).popup({ window: win });
+  });
 
   // Inyectar CSS/JS del usuario + detectar formularios de login
   win.webContents.on('did-finish-load', async () => {
@@ -828,24 +1022,131 @@ function createAppWindow(appConfig, options = {}) {
   };
   ipcMain.on('ssb:badge-update', onBadgeUpdate);
 
+  // Clic en una notificación nativa del SO → enfocar/restaurar la ventana de la app
+  const onNotificationClicked = (event) => {
+    if (event.sender !== win.webContents || win.isDestroyed()) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  };
+  ipcMain.on('ssb:notification-clicked', onNotificationClicked);
+
   const onTogglePipWindow = (event) => {
     if (event.sender !== win.webContents || win.isDestroyed()) return;
     const isPip = win.__appSpawnerPip === true;
     win.__appSpawnerPip = !isPip;
     win.setAlwaysOnTop(!isPip, 'floating');
+
+    const data     = store.read();
+    const appIndex = data.apps.findIndex(a => a.id === id);
+    const pipState = (appIndex !== -1 && data.apps[appIndex].pipState) || {};
+
     if (!isPip) {
-      win.setSize(460, 280);
+      // Entrando en modo PiP: recordar el tamaño/posición normal y restaurar el último PiP usado
+      pipState.normal = win.getBounds();
       win.setResizable(true);
+      if (pipState.pip) {
+        win.setBounds(pipState.pip);
+      } else {
+        const area = screen.getPrimaryDisplay().workArea;
+        const width = 460, height = 280;
+        win.setBounds({ x: area.x + area.width - width - 24, y: area.y + area.height - height - 24, width, height });
+      }
     } else {
-      win.setSize(windowConfig.width || 1280, windowConfig.height || 800);
+      // Saliendo de PiP: recordar el tamaño/posición flotante y restaurar el normal
+      pipState.pip = win.getBounds();
+      win.setBounds(pipState.normal || { width: windowConfig.width || 1280, height: windowConfig.height || 800 });
+    }
+
+    if (appIndex !== -1) {
+      data.apps[appIndex].pipState = pipState;
+      store.write(data);
     }
   };
   ipcMain.on('ssb:toggle-pip-window', onTogglePipWindow);
 
+  // Pausa rapida de AdBlock desde la toolbar SSB
+  const onToggleAdBlock = (event) => {
+    if (event.sender !== win.webContents || win.isDestroyed()) return;
+    const appData  = store.read();
+    const appIndex = appData.apps.findIndex(a => a.id === id);
+    if (appIndex === -1) return;
+    const current = appData.apps[appIndex].adblockEnabled ?? true;
+    appData.apps[appIndex].adblockEnabled = !current;
+    store.write(appData);
+    const { settings } = store.read();
+    const sess = electronSession.fromPartition(`persist:app_${id}`);
+    const globalEnabled    = settings.adblockEnabled    ?? true;
+    const globalAggressive = settings.adblockAggressive ?? true;
+    const globalAnnoyances = settings.adblockAnnoyances ?? true;
+    applyAdBlockToSession(sess, id, {
+      enabled: globalEnabled && appData.apps[appIndex].adblockEnabled,
+      customRules: appData.apps[appIndex].adblockCustomRules || [],
+      aggressive:  appData.apps[appIndex].adblockAggressiveOverride ?? globalAggressive,
+      annoyances:  globalAnnoyances,
+      filterCategories: appData.apps[appIndex].adblockFilterCategories ?? null,
+      onPermissionRequest: (permission, granted) => recordPermission(id, permission, granted),
+    });
+    const newEnabled = appData.apps[appIndex].adblockEnabled;
+    event.sender.send('adblock:status-changed', { enabled: newEnabled });
+    mainWindow?.webContents.send('adblock:app-toggled', { appId: id, enabled: newEnabled });
+    if (newEnabled) win.webContents.reload();
+  };
+  ipcMain.on('ssb:toggle-adblock', onToggleAdBlock);
+
+  // Element picker: cuando el SSB elige un elemento lo registramos como regla cosmetica
+  const onElementPicked = (event, { selector, hostname } = {}) => {
+    if (event.sender !== win.webContents || !selector) return;
+    const pickData  = store.read();
+    const pickIndex = pickData.apps.findIndex(a => a.id === id);
+    if (pickIndex === -1) return;
+    const rule = hostname ? `${hostname}##${selector}` : `##${selector}`;
+    const existing = pickData.apps[pickIndex].adblockCosmeticRules || [];
+    if (!existing.includes(rule)) {
+      pickData.apps[pickIndex].adblockCosmeticRules = [...existing, rule];
+      store.write(pickData);
+      mainWindow?.webContents.send('adblock:cosmetic-rule-added', { appId: id, rule });
+    }
+  };
+  ipcMain.on('ssb:element-picked', onElementPicked);
+
+  // Guardar snapshot de sesión desde la toolbar SSB
+  const onSaveSnapshot = async (event) => {
+    if (event.sender !== win.webContents || win.isDestroyed()) return;
+    try {
+      const cookies = await electronSession.fromPartition(`persist:app_${id}`).cookies.get({});
+      const snapshot = { id: uuidv4(), name: `Sesión ${new Date().toLocaleString('es')}`, savedAt: Date.now(), cookies };
+      const dir = path.join(app.getPath('userData'), 'session-snapshots', id);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, `${snapshot.id}.json`), JSON.stringify(snapshot));
+      if (!win.isDestroyed()) win.webContents.send('ssb:snapshot-saved', { name: snapshot.name });
+    } catch (err) { console.error('[Snapshot]', err.message); }
+  };
+  ipcMain.on('ssb:save-snapshot', onSaveSnapshot);
+
+  // Actualizar botones de la toolbar desde el editor SSB
+  const VALID_TOOLBAR_BTNS = ['back','forward','reload','home','pip','notes','devtools','shield','picker','snapshot','settings'];
+  const onUpdateToolbarButtons = (event, buttons) => {
+    if (event.sender !== win.webContents || win.isDestroyed()) return;
+    const safe = Array.isArray(buttons) ? buttons.filter(b => VALID_TOOLBAR_BTNS.includes(b)) : [];
+    const d = store.read();
+    const i = d.apps.findIndex(a => a.id === id);
+    if (i !== -1) {
+      d.apps[i].toolbar = { ...d.apps[i].toolbar, buttons: safe };
+      store.write(d);
+    }
+  };
+  ipcMain.on('ssb:update-toolbar-buttons', onUpdateToolbarButtons);
+
   win.on('closed', () => {
     ipcMain.removeListener('ssb:badge-update', onBadgeUpdate);
+    ipcMain.removeListener('ssb:notification-clicked', onNotificationClicked);
     ipcMain.removeListener('ssb:toggle-pip-window', onTogglePipWindow);
     ipcMain.removeListener('ssb:open-devtools', onOpenDevTools);
+    ipcMain.removeListener('ssb:toggle-adblock', onToggleAdBlock);
+    ipcMain.removeListener('ssb:element-picked', onElementPicked);
+    ipcMain.removeListener('ssb:save-snapshot', onSaveSnapshot);
+    ipcMain.removeListener('ssb:update-toolbar-buttons', onUpdateToolbarButtons);
     appWindows.delete(id);
     mainWindow?.webContents.send('app:window-closed', id);
     mainWindow?.webContents.send('badge:update', { appId: id, count: 0 });
@@ -890,6 +1191,29 @@ function registerIpcHandlers() {
   registerCredentialHandlers(ipcMain, appWindows);
   registerTotpHandlers(ipcMain);
   registerAdBlockHandlers(ipcMain, store);
+  registerDownloadHandlers(ipcMain, () => mainWindow);
+  registerHistoryHandlers(ipcMain);
+  registerDiagnosticsHandlers(ipcMain, store, getSessionSize);
+
+  // Registrar tiempo de uso por app (llamado desde el renderer cuando cierra una ventana)
+  ipcMain.handle('app:record-time', (_e, appId, ms) => {
+    if (!appId || typeof ms !== 'number' || ms <= 0) return;
+    const d = store.read();
+    const i = d.apps.findIndex(a => a.id === appId);
+    if (i === -1) return;
+    d.apps[i].timeSpentMs = (d.apps[i].timeSpentMs || 0) + Math.round(ms);
+    store.write(d);
+  });
+
+  // Activar element picker en una ventana SSB desde el dashboard
+  ipcMain.handle('adblock:start-element-picker', async (_e, appId) => {
+    const ssbWin = appWindows.get(appId);
+    if (!ssbWin || ssbWin.isDestroyed()) return { success: false, error: 'Ventana no encontrada' };
+    await ssbWin.webContents.executeJavaScript(
+      `typeof window.__appSpawnerStartElementPicker === 'function' && window.__appSpawnerStartElementPicker()`
+    ).catch(() => {});
+    return { success: true };
+  });
 
   // ── Settings ───────────────────────────────────────────────────────────────
   ipcMain.handle('settings:get', () => store.read().settings);

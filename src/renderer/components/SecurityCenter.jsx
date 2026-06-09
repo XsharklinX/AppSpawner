@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useApps }  from '../contexts/AppContext';
 import { useToast } from '../contexts/ToastContext';
+import EmptyState   from './common/EmptyState';
 
 // ── Tab: Contraseñas ──────────────────────────────────────────────────────────
 
@@ -67,10 +68,7 @@ function PasswordsTab({ app }) {
   return (
     <div className="flex flex-col gap-3">
       {creds.length === 0 && !adding ? (
-        <div className="flex flex-col items-center py-8 gap-3 text-white/20">
-          <KeyRound size={28} />
-          <p className="text-sm">Sin contraseñas guardadas</p>
-        </div>
+        <EmptyState icon={KeyRound} title="Sin contraseñas guardadas" compact />
       ) : (
         <div className="flex flex-col gap-2">
           {creds.map(c => (
@@ -221,13 +219,12 @@ function OTPTab({ app }) {
   return (
     <div className="flex flex-col gap-3">
       {entries.length === 0 && !adding ? (
-        <div className="flex flex-col items-center py-8 gap-3 text-white/20">
-          <ShieldCheck size={28} />
-          <p className="text-sm">Sin códigos 2FA guardados</p>
-          <p className="text-[11px] text-center max-w-[240px] leading-relaxed text-white/15">
-            Añade el secreto TOTP de tu app para generar códigos sin necesitar el móvil.
-          </p>
-        </div>
+        <EmptyState
+          icon={ShieldCheck}
+          title="Sin códigos 2FA guardados"
+          description="Añade el secreto TOTP de tu app para generar códigos sin necesitar el móvil."
+          compact
+        />
       ) : (
         <div className="flex flex-col gap-3">
           {entries.map(e => {

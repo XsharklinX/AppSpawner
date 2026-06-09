@@ -6,6 +6,7 @@
  */
 const { v4: uuidv4 } = require('uuid');
 const { app, session } = require('electron');
+const { clearAppDiagnostics } = require('./diagnostics');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -202,14 +203,17 @@ function registerAppManagerHandlers(ipcMain, store, createAppWindow, appWindows)
         enabled:  !!config.screenshotConfig?.enabled,
         interval: Math.max(1, Math.min(1440, parseInt(config.screenshotConfig?.interval) || 30)),
       },
-      adblockEnabled:     config.adblockEnabled !== false,
-      adblockCustomRules: Array.isArray(config.adblockCustomRules) ? config.adblockCustomRules : [],
+      adblockEnabled:          config.adblockEnabled            !== false,
+      adblockCustomRules:      Array.isArray(config.adblockCustomRules)    ? config.adblockCustomRules    : [],
+      adblockCosmeticRules:    Array.isArray(config.adblockCosmeticRules)  ? config.adblockCosmeticRules  : [],
+      adblockFilterCategories: config.adblockFilterCategories  ?? null,
+      adblockAggressiveOverride: config.adblockAggressiveOverride ?? null,
       userAgent:    config.userAgent   || '',
       windowConfig,
       toolbar: {
         enabled: !!config.toolbar?.enabled,
         buttons: Array.isArray(config.toolbar?.buttons)
-          ? config.toolbar.buttons.filter(b => ['back','forward','reload','home','pip','notes','devtools'].includes(b)).slice(0, 8)
+          ? config.toolbar.buttons.filter(b => ['back','forward','reload','home','pip','notes','devtools','shield','picker','snapshot','settings'].includes(b)).slice(0, 12)
           : ['back','forward','reload','home','pip','notes','devtools'],
       },
       shortcuts: {
@@ -269,6 +273,8 @@ function registerAppManagerHandlers(ipcMain, store, createAppWindow, appWindows)
       await sess.clearCache();
     } catch {}
 
+    clearAppDiagnostics(appId);
+
     return { success: true };
   });
 
@@ -286,7 +292,7 @@ function registerAppManagerHandlers(ipcMain, store, createAppWindow, appWindows)
       }
     }
     try {
-      createAppWindow(data.apps[index], { authorized: true });
+      createAppWindow(data.apps[index], { authorized: true, navigateTo: options.navigateTo || null });
       data.apps[index].openCount = (data.apps[index].openCount || 0) + 1;
       store.write(data);
       return { success: true };
@@ -349,4 +355,4 @@ function registerAppManagerHandlers(ipcMain, store, createAppWindow, appWindows)
   });
 }
 
-module.exports = { registerAppManagerHandlers, sanitizeUrl };
+module.exports = { registerAppManagerHandlers, sanitizeUrl, getSessionSize };

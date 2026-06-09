@@ -1,10 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Play, Settings2, Trash2, Clock, Pin, PinOff, Camera, Code2, Shield, Share2, LogIn } from 'lucide-react';
+import { Play, Settings2, Trash2, Clock, Pin, PinOff, Camera, Code2, Shield, Share2, LogIn, Stethoscope } from 'lucide-react';
 import AppIcon               from './AppIcon';
-import Modal                 from './Modal';
-import SessionSnapshots      from '../SessionSnapshots';
-import AppScripts            from '../AppScripts';
-import SecurityCenter        from '../SecurityCenter';
+import Tooltip               from './Tooltip';
 import { useApps }            from '../../contexts/AppContext';
 import { useI18n }            from '../../contexts/I18nContext';
 import { useToast }           from '../../contexts/ToastContext';
@@ -14,14 +11,11 @@ import { formatRelativeTime } from '../../lib/utils';
  * AppCard — Tarjeta de app instalada. Memoizada con React.memo
  * para evitar re-renders innecesarios cuando cambian otras apps.
  */
-const AppCard = React.memo(function AppCard({ app, onEdit }) {
+const AppCard = React.memo(function AppCard({ app, onEdit, onOpenTools }) {
   const [hovered,      setHovered]      = useState(false);
   const [launching,    setLaunching]    = useState(false);
   const [confirm,      setConfirm]      = useState(false);
   const [loginAlert,   setLoginAlert]   = useState(false);
-  const [showSessions,  setShowSessions]  = useState(false);
-  const [showScripts,   setShowScripts]   = useState(false);
-  const [showSecurity,  setShowSecurity]  = useState(false);
 
   const { launchApp, uninstallApp, togglePin, isWindowOpen, badgeCounts } = useApps();
   const { t, language } = useI18n();
@@ -79,12 +73,11 @@ const AppCard = React.memo(function AppCard({ app, onEdit }) {
   }, [app, toast]);
 
   return (
-    <>
     <div
       className={`
         relative glass rounded-2xl overflow-hidden cursor-pointer group
-        transition-all duration-200 min-h-[178px]
-        ${hovered ? 'shadow-card-hover -translate-y-[3px] border-white/[0.12]' : 'shadow-card'}
+        transition-all duration-200 min-h-[198px]
+        ${hovered ? 'shadow-card-hover -translate-y-[3px] border-line/[0.12]' : 'shadow-card'}
         ${app.pinned ? 'ring-1 ring-violet-500/25' : ''}
       `}
       onMouseEnter={() => { setHovered(true); setConfirm(false); }}
@@ -121,7 +114,7 @@ const AppCard = React.memo(function AppCard({ app, onEdit }) {
       )}
 
       {/* ── Contenido ──────────────────────────────────────────────────── */}
-      <div className="relative flex flex-col gap-3 p-4 pt-5 min-h-[178px]">
+      <div className="relative flex flex-col gap-3 p-4 pt-5 min-h-[198px]">
         {/* Ícono */}
         <div className="relative self-start">
           <AppIcon
@@ -139,7 +132,7 @@ const AppCard = React.memo(function AppCard({ app, onEdit }) {
 
         {/* Nombre */}
         <div>
-          <h3 className="text-sm font-bold text-white/90 leading-tight truncate">
+          <h3 className="text-sm font-bold text-fg/90 leading-tight truncate">
             {app.name}
           </h3>
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
@@ -153,11 +146,11 @@ const AppCard = React.memo(function AppCard({ app, onEdit }) {
         </div>
 
         {/* Último uso */}
-        <div className="flex items-center gap-1.5 mt-auto border-t border-white/[0.05] pt-3">
-          <Clock size={10} className="text-white/18 flex-shrink-0" />
-          <span className="text-[10px] text-white/28 truncate">{relativeTime}</span>
+        <div className="flex items-center gap-1.5 mt-auto border-t border-line/[0.05] pt-3">
+          <Clock size={10} className="text-fg/18 flex-shrink-0" />
+          <span className="text-[10px] text-fg/28 truncate">{relativeTime}</span>
           {app.openCount > 0 && (
-            <span className="text-[10px] text-white/18 ml-auto">{app.openCount}×</span>
+            <span className="text-[10px] text-fg/32 ml-auto">{app.openCount}×</span>
           )}
         </div>
       </div>
@@ -187,64 +180,58 @@ const AppCard = React.memo(function AppCard({ app, onEdit }) {
         <div className="flex gap-1.5 flex-shrink-0">
           <button
             onClick={e => { e.stopPropagation(); onEdit?.(app); }}
-            className="flex-1 flex items-center justify-center gap-1.5 text-xs text-white/55 hover:text-white/90 bg-white/[0.05] hover:bg-white/[0.09] rounded-xl py-2.5 transition-all"
+            className="flex-1 flex items-center justify-center gap-1.5 text-xs text-fg/55 hover:text-fg/90 bg-overlay/[0.05] hover:bg-overlay/[0.09] rounded-xl py-2.5 transition-all"
           >
             <Settings2 size={13} /> Editar
           </button>
-          <button
-            onClick={handlePin}
-            className={`flex items-center justify-center rounded-xl px-3 py-2.5 transition-all ${
-              app.pinned ? 'bg-violet-600/25 text-violet-400' : 'bg-white/[0.05] text-white/40 hover:text-violet-400'
-            }`}
-            title={app.pinned ? 'Desfijar' : 'Fijar'}
-          >
-            {app.pinned ? <PinOff size={13} /> : <Pin size={13} />}
-          </button>
-          <button
-            onClick={handleUninstall}
-            className={`flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-xs font-medium transition-all ${
-              confirm ? 'bg-red-500/80 text-white' : 'bg-white/[0.05] text-white/35 hover:text-red-400'
-            }`}
-            title={t('dash_uninstall')}
-          >
-            <Trash2 size={13} />
-            {confirm && 'Seguro'}
-          </button>
+          <Tooltip label={app.pinned ? 'Desfijar' : 'Fijar'}>
+            <button
+              onClick={handlePin}
+              className={`flex items-center justify-center rounded-xl px-3 py-2.5 transition-all ${
+                app.pinned ? 'bg-violet-600/25 text-violet-400' : 'bg-overlay/[0.05] text-fg/40 hover:text-violet-400'
+              }`}
+            >
+              {app.pinned ? <PinOff size={13} /> : <Pin size={13} />}
+            </button>
+          </Tooltip>
+          <Tooltip label={t('dash_uninstall')}>
+            <button
+              onClick={handleUninstall}
+              className={`flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-xs font-medium transition-all ${
+                confirm ? 'bg-red-500/80 text-white' : 'bg-overlay/[0.05] text-fg/35 hover:text-red-400'
+              }`}
+            >
+              <Trash2 size={13} />
+              {confirm && 'Seguro'}
+            </button>
+          </Tooltip>
         </div>
 
         {/* Herramientas */}
-        <div className="flex gap-1.5 flex-shrink-0 mt-auto">
+        <div className="grid grid-cols-3 gap-1.5 flex-shrink-0 mt-auto">
           {[
-            { icon: Camera, label: 'Sesiones',     fn: e => { e.stopPropagation(); setShowSessions(true); } },
-            { icon: Code2,  label: 'Scripts',       fn: e => { e.stopPropagation(); setShowScripts(true); } },
-            { icon: Shield, label: 'Seguridad',     fn: e => { e.stopPropagation(); setShowSecurity(true); setLoginAlert(false); }, alert: loginAlert },
-            { icon: Share2, label: 'Compartir',     fn: handleShare },
-            { icon: LogIn,  label: 'Easy Login',    fn: handleEasyLogin },
+            { icon: Camera,      label: 'Sesiones',    fn: e => { e.stopPropagation(); onOpenTools?.(app, 'sessions'); } },
+            { icon: Code2,       label: 'Scripts',     fn: e => { e.stopPropagation(); onOpenTools?.(app, 'scripts'); } },
+            { icon: Shield,      label: 'Seguridad',   fn: e => { e.stopPropagation(); onOpenTools?.(app, 'security'); setLoginAlert(false); }, alert: loginAlert },
+            { icon: Stethoscope, label: 'Diagnostico', fn: e => { e.stopPropagation(); onOpenTools?.(app, 'diagnostics'); } },
+            { icon: Share2,      label: 'Compartir',   fn: handleShare },
+            { icon: LogIn,       label: 'Login',       fn: handleEasyLogin },
           ].map(({ icon: Icon, label, fn, alert }) => (
             <button key={label} onClick={fn} title={label}
-              className="relative flex-1 flex items-center justify-center py-2 rounded-lg bg-white/[0.04] hover:bg-violet-600/20 text-white/30 hover:text-violet-400 transition-all"
+              className="relative flex flex-col items-center justify-center gap-1 py-2 rounded-lg bg-overlay/[0.04] hover:bg-violet-600/20 text-fg/35 hover:text-violet-300 transition-all"
             >
-              <Icon size={13} />
-              {alert && <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-violet-400" />}
+              <Icon size={14} />
+              <span className="text-[8.5px] font-medium leading-none truncate max-w-full px-0.5">{label}</span>
+              {alert && <span className="absolute top-1 right-1.5 w-1.5 h-1.5 rounded-full bg-violet-400" />}
             </button>
           ))}
         </div>
       </div>
     </div>
-    <Modal isOpen={showSessions} onClose={() => setShowSessions(false)} title={`Sesiones — ${app.name}`} size="lg">
-      <SessionSnapshots app={app} onClose={() => setShowSessions(false)} />
-    </Modal>
-    <Modal isOpen={showScripts} onClose={() => setShowScripts(false)} title={`Scripts — ${app.name}`} size="xl">
-      <AppScripts app={app} />
-    </Modal>
-    <Modal isOpen={showSecurity} onClose={() => setShowSecurity(false)} title={`Seguridad — ${app.name}`} size="xl">
-      <SecurityCenter app={app} />
-    </Modal>
-    </>
   );
 }, (prev, next) => {
   // Comparación personalizada: solo re-renderizar si la app cambia
-  return prev.app === next.app && prev.onEdit === next.onEdit;
+  return prev.app === next.app && prev.onEdit === next.onEdit && prev.onOpenTools === next.onOpenTools;
 });
 
 export default AppCard;

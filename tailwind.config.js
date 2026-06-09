@@ -8,6 +8,12 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Tokens adaptativos: cambian de blanco-sobre-oscuro a oscuro-sobre-claro segun el tema
+        // (ver --fg-rgb/--overlay-rgb/--line-rgb en index.css). Usar en vez de white/black
+        // para texto, superposiciones y bordes que deben respetar el modo claro/oscuro.
+        fg:      'rgb(var(--fg-rgb) / <alpha-value>)',
+        overlay: 'rgb(var(--overlay-rgb) / <alpha-value>)',
+        line:    'rgb(var(--line-rgb) / <alpha-value>)',
         // Design system tokens
         surface: {
           base:     '#09090e',
