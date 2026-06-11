@@ -1050,6 +1050,6 @@ export const DISCOVER_APPS = [
 ];
 
 /** Versión de la aplicación */
-export const APP_VERSION = '3.1.0';
+export const APP_VERSION = '3.2.0';
 export const APP_NAME    = 'AppSpawner';
 export const APP_BUILD   = 'Premium Build';

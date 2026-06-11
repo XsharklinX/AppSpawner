@@ -64,7 +64,7 @@ function bridgeNativeNotifications() {
 bridgeNativeNotifications();
 
 const DEFAULT_CONFIG = {
-  version: '3.1.0',
+  version: '3.2.0',
   homeUrl: '',
   adblock: {
     enabled: true,
@@ -358,6 +358,50 @@ function openToolbarEditor() {
 
 // ── Element picker ────────────────────────────────────────────────────────────
 
+function safeCssIdent(str) {
+  if (typeof CSS !== 'undefined' && CSS.escape) return CSS.escape(str);
+  return String(str || '').replace(/[^\w-]/g, c => `\\${c}`);
+}
+
+function stableElementSelector(el, { maxDepth = 5 } = {}) {
+  if (!(el instanceof Element)) return null;
+  const parts = [];
+  let cur = el;
+  while (cur && cur !== document.body && cur !== document.documentElement && parts.length < maxDepth) {
+    if (cur.id && /^[a-z]/i.test(cur.id) && !/(\d{4,}|random|uuid|generated)/i.test(cur.id)) {
+      parts.unshift(`#${safeCssIdent(cur.id)}`);
+      break;
+    }
+    const tag = cur.tagName.toLowerCase();
+    const classes = Array.from(cur.classList || [])
+      .filter(c => c && !/^(is-|has-|active|hover|focus|selected|disabled|open|show|hide|visible|hidden|ng-|css-|jsx-|sc-)/.test(c))
+      .filter(c => !/\d{4,}|[a-f0-9]{8,}/i.test(c))
+      .slice(0, 2)
+      .map(c => `.${safeCssIdent(c)}`)
+      .join('');
+    const attrName = cur.getAttribute('data-testid') ? 'data-testid'
+      : cur.getAttribute('data-test') ? 'data-test'
+      : cur.getAttribute('aria-label') ? 'aria-label'
+      : '';
+    const attrValue = attrName ? String(cur.getAttribute(attrName)).replace(/"/g, '\\"').slice(0, 80) : '';
+    parts.unshift(tag + classes + (attrName && parts.length === 0 ? `[${attrName}="${attrValue}"]` : ''));
+    cur = cur.parentElement;
+  }
+  return parts.length ? parts.join(' > ') : null;
+}
+
+function pickerTargetFromEvent(event, hovered) {
+  if (!hovered) return null;
+  if (!event.shiftKey) return hovered;
+  let cur = hovered;
+  for (let i = 0; i < 3 && cur?.parentElement && cur.parentElement !== document.body; i++) {
+    const rect = cur.parentElement.getBoundingClientRect();
+    if (rect.width > window.innerWidth * 0.95 && rect.height > window.innerHeight * 0.85) break;
+    cur = cur.parentElement;
+  }
+  return cur;
+}
+
 function startElementPicker() {
   if (document.getElementById('appspawner-picker-marker')) return;
 
@@ -409,34 +453,10 @@ function startElementPicker() {
   const bar = document.createElement('div');
   bar.id = 'appspawner-picker-bar';
   bar.dataset.appspawnerUi = 'true';
-  bar.innerHTML = `<strong>Selector de elementos</strong> &mdash; Clic para ocultar &nbsp;&middot;&nbsp; <kbd>Esc</kbd> para cancelar`;
+  bar.innerHTML = `<strong>Inspector AdBlock</strong> &mdash; Clic oculta elemento &nbsp;&middot;&nbsp; <kbd>Shift</kbd> + clic oculta contenedor &nbsp;&middot;&nbsp; <kbd>Esc</kbd> cancela`;
   document.body.appendChild(bar);
 
   let lastHovered = null;
-
-  function safeEscape(str) {
-    if (typeof CSS !== 'undefined' && CSS.escape) return CSS.escape(str);
-    return str.replace(/[^\w-]/g, c => `\\${c}`);
-  }
-
-  function generateSelector(el) {
-    const parts = [];
-    let cur = el;
-    while (cur && cur !== document.body && parts.length < 5) {
-      if (cur.id && /^[a-z]/i.test(cur.id)) {
-        parts.unshift(`#${safeEscape(cur.id)}`);
-        break;
-      }
-      const tag = cur.tagName.toLowerCase();
-      const cls = Array.from(cur.classList)
-        .filter(c => !/^(is-|has-|active|hover|focus|selected|disabled|open|show|hide|visible|hidden)/.test(c))
-        .slice(0, 2)
-        .map(c => `.${safeEscape(c)}`).join('');
-      parts.unshift(tag + cls);
-      cur = cur.parentElement;
-    }
-    return parts.length ? parts.join(' > ') : null;
-  }
 
   function onMouseMove(e) {
     const el = document.elementFromPoint(e.clientX, e.clientY);
@@ -447,7 +467,7 @@ function startElementPicker() {
     highlight.style.top    = `${rect.top  + window.scrollY}px`;
     highlight.style.width  = `${rect.width}px`;
     highlight.style.height = `${rect.height}px`;
-    const sel = generateSelector(el);
+    const sel = stableElementSelector(el);
     tooltip.textContent = sel || el.tagName.toLowerCase();
     const tx = Math.min(e.clientX + 14, window.innerWidth - 460);
     const ty = e.clientY > window.innerHeight - 80 ? e.clientY - 52 : e.clientY + 18;
@@ -460,7 +480,8 @@ function startElementPicker() {
     e.preventDefault();
     e.stopImmediatePropagation();
     if (!lastHovered) return;
-    const sel = generateSelector(lastHovered);
+    const target = pickerTargetFromEvent(e, lastHovered);
+    const sel = stableElementSelector(target);
     if (!sel) return;
     ipcRenderer.send('ssb:element-picked', { selector: sel, hostname: location.hostname });
     // Ocultar inmediatamente el elemento en esta sesion
@@ -469,7 +490,9 @@ function startElementPicker() {
       styleEl.dataset.appspawnerUi = 'true';
       styleEl.textContent = `${sel} { display:none!important; }`;
       document.head.appendChild(styleEl);
+      target?.remove?.();
     } catch {}
+    showSsbToast('Regla cosmetica guardada', 'success');
     cleanup();
   }
 
@@ -749,11 +772,36 @@ function injectAntiNotificationCss() {
     [class*="push-notif" i]:not([data-appspawner-ui]),
     [class*="notification-widget" i]:not([data-appspawner-ui]),
     [class*="notif-popup" i]:not([data-appspawner-ui]),
+    [class*="social-bar" i]:not([data-appspawner-ui]),
+    [class*="socialbar" i]:not([data-appspawner-ui]),
+    [class*="social-proof" i]:not([data-appspawner-ui]),
+    [class*="fake-notif" i]:not([data-appspawner-ui]),
+    [class*="toast-ad" i]:not([data-appspawner-ui]),
+    [id*="social-bar" i]:not([data-appspawner-ui]),
+    [id*="socialbar" i]:not([data-appspawner-ui]),
     [id*="notif-banner" i]:not([data-appspawner-ui]),
     [id*="push-banner" i]:not([data-appspawner-ui]),
     [class*="pushNotif" i]:not([data-appspawner-ui]) { display: none !important; }
   `;
   (document.head || document.documentElement).appendChild(style);
+}
+
+const overlayLogSeen = new Set();
+
+function logDomBlock(node, reason) {
+  try {
+    const selector = stableElementSelector(node) || node?.tagName?.toLowerCase?.() || '';
+    const key = `${reason}:${selector}`;
+    if (overlayLogSeen.has(key)) return;
+    overlayLogSeen.add(key);
+    if (overlayLogSeen.size > 120) overlayLogSeen.clear();
+    ipcRenderer.send('ssb:cosmetic-blocked', {
+      selector,
+      reason,
+      url: location.href,
+      hostname: location.hostname,
+    });
+  } catch {}
 }
 
 function overlaysVideo(node) {
@@ -765,9 +813,11 @@ function overlaysVideo(node) {
   const rect = node.getBoundingClientRect();
   if (rect.width < 40 || rect.height < 40) return false;
   const opacity = Number.parseFloat(style.opacity || '1');
-  const transparent = opacity < 0.08 || style.backgroundColor === 'rgba(0, 0, 0, 0)';
-  const empty = elementText(node).length < 4 && node.querySelectorAll('button, a, input, select, textarea').length === 0;
-  if (!transparent && !empty) return false;
+  const transparent = opacity < 0.12 || style.backgroundColor === 'rgba(0, 0, 0, 0)';
+  const interactive = node.querySelectorAll('button, a, input, select, textarea, [role="button"], [controls]').length > 0;
+  const empty = elementText(node).length < 4 && !interactive;
+  const suspiciousClass = /ad|click|overlay|popup|interstitial|vast|vpaid|preroll|sponsor/i.test(`${node.id || ''} ${node.className || ''}`);
+  if (!transparent && !empty && !suspiciousClass) return false;
   const videos = Array.from(document.querySelectorAll('video')).filter(video => video.offsetWidth > 160 && video.offsetHeight > 90);
   return videos.some(video => {
     const v = video.getBoundingClientRect();
@@ -804,12 +854,15 @@ function scanAnnoyances(root = document) {
   for (const node of nodes) {
     if (!(node instanceof Element) || isAppSpawnerUi(node)) continue;
     if (looksLikeFakeNotification(node) || isTopCornerNotification(node)) {
+      logDomBlock(node, 'Fake notification removida');
       node.remove();
       continue;
     }
     if (overlaysVideo(node)) {
       node.style.pointerEvents = 'none';
+      node.style.cursor = 'default';
       node.setAttribute('data-appspawner-overlay-neutralized', 'true');
+      logDomBlock(node, 'Overlay sobre video neutralizado');
     }
   }
 }
@@ -883,7 +936,7 @@ installAntiAnnoyanceGuard();
 if (isTopFrame) {
   contextBridge.exposeInMainWorld('appSpawner', {
     isSSB: true,
-    version: '3.1.0',
+    version: '3.2.0',
     goBack: () => window.history.back(),
     goForward: () => window.history.forward(),
     reload: () => window.location.reload(),

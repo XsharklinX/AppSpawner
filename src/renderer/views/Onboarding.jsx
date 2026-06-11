@@ -14,6 +14,7 @@ const COPY = {
     skip: 'Saltar introducción',
     nameLabel: 'Nombre para personalizar tu espacio',
     namePlaceholder: 'Tu nombre',
+    focusLabel: 'Como quieres empezar',
     saving: 'Preparando tu espacio...',
     welcomeTitle: 'AppSpawner convierte sitios web en apps de escritorio',
     welcomeText: 'Crea ventanas independientes para tus servicios, con sesiones separadas, icono propio, acceso directo y controles pensados para usarlas todos los días.',
@@ -38,6 +39,11 @@ const COPY = {
       'Apps web con comportamiento más cercano a escritorio.',
       'Base preparada para perfiles, automatizaciones, PIN y reglas avanzadas.',
     ],
+    focusOptions: [
+      ['personal', 'Personal', 'Streaming, IA, estudio y apps diarias.'],
+      ['work', 'Trabajo', 'Clientes, productividad, desarrollo y cuentas separadas.'],
+      ['mixed', 'Mixto', 'Separar ambos mundos desde el primer dia.'],
+    ],
   },
   en: {
     next: 'Continue',
@@ -46,6 +52,7 @@ const COPY = {
     skip: 'Skip intro',
     nameLabel: 'Name for your workspace',
     namePlaceholder: 'Your name',
+    focusLabel: 'How do you want to start',
     saving: 'Preparing your workspace...',
     welcomeTitle: 'AppSpawner turns websites into desktop apps',
     welcomeText: 'Create independent windows for your services, with separated sessions, custom icons, shortcuts, and daily-use controls.',
@@ -70,12 +77,18 @@ const COPY = {
       'Web apps that behave closer to desktop apps.',
       'A base ready for profiles, automations, PIN, and advanced rules.',
     ],
+    focusOptions: [
+      ['personal', 'Personal', 'Streaming, AI, learning, and daily apps.'],
+      ['work', 'Work', 'Clients, productivity, development, and separated accounts.'],
+      ['mixed', 'Mixed', 'Separate both worlds from day one.'],
+    ],
   },
 };
 
 export default function Onboarding({ onComplete }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
+  const [focus, setFocus] = useState('mixed');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const inputRef = useRef(null);
@@ -124,7 +137,7 @@ export default function Onboarding({ onComplete }) {
     setError('');
     try {
       const defaultPath = await window.electronAPI?.getDefaultInstallPath() ?? '';
-      const user = { name: trimmed, installPath: defaultPath, createdAt: Date.now() };
+      const user = { name: trimmed, installPath: defaultPath, onboardingFocus: focus, createdAt: Date.now() };
       await window.electronAPI?.saveUser(user);
       localStorage.setItem('as_user', JSON.stringify(user));
       toast.success(`Bienvenido, ${trimmed}`, 'AppSpawner listo');
@@ -181,18 +194,39 @@ export default function Onboarding({ onComplete }) {
             </p>
 
             {current.final && (
-              <div className="mt-7 max-w-md">
-                <label className="form-label">{copy.nameLabel}</label>
-                <input
-                  ref={inputRef}
-                  value={name}
-                  onChange={e => { setName(e.target.value); setError(''); }}
-                  onKeyDown={e => e.key === 'Enter' && saveUser()}
-                  placeholder={copy.namePlaceholder}
-                  className={`input-field text-base ${error ? 'border-red-500/60' : ''}`}
-                  maxLength={50}
-                />
-                {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
+              <div className="mt-7 max-w-md space-y-5">
+                <div>
+                  <p className="form-label">{copy.focusLabel}</p>
+                  <div className="grid gap-2">
+                    {copy.focusOptions.map(([id, title, description]) => (
+                      <button
+                        key={id}
+                        onClick={() => setFocus(id)}
+                        className={`text-left rounded-xl border px-3 py-2.5 transition-all ${
+                          focus === id
+                            ? 'bg-violet-600/18 border-violet-400/45 text-white'
+                            : 'bg-white/[0.035] border-white/[0.07] text-white/55 hover:text-white/80'
+                        }`}
+                      >
+                        <span className="block text-sm font-semibold">{title}</span>
+                        <span className="block text-xs text-white/35 mt-0.5">{description}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="form-label">{copy.nameLabel}</label>
+                  <input
+                    ref={inputRef}
+                    value={name}
+                    onChange={e => { setName(e.target.value); setError(''); }}
+                    onKeyDown={e => e.key === 'Enter' && saveUser()}
+                    placeholder={copy.namePlaceholder}
+                    className={`input-field text-base ${error ? 'border-red-500/60' : ''}`}
+                    maxLength={50}
+                  />
+                  {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
+                </div>
               </div>
             )}
           </section>

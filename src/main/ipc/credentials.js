@@ -235,7 +235,22 @@ async function _doAutofill(appWindows, appId, cred) {
   try {
     const password = dec(cred.password);
     const result   = await win.webContents.executeJavaScript(buildFillScript(cred.username, password, cred.selectors));
-    return { success: true, ...result };
+    if (!result?.filledUser && !result?.filledPass) {
+      return {
+        success: false,
+        needsSelectors: true,
+        error: 'No detecte campos de usuario o contrasena. Abre el login visible o configura selectors avanzados.',
+        ...result,
+      };
+    }
+    const missing = [];
+    if (!result.filledUser) missing.push('usuario');
+    if (!result.filledPass) missing.push('contrasena');
+    return {
+      success: true,
+      warning: missing.length ? `No pude detectar: ${missing.join(', ')}.` : '',
+      ...result,
+    };
   } catch (err) { return { success: false, error: err.message }; }
 }
 

@@ -70,6 +70,21 @@ export default function AdBlock() {
     return () => unsub?.();
   }, [toast]);
 
+  useEffect(() => {
+    const unsub = window.electronAPI?.onAdBlockDomBlocked?.((event) => {
+      if (event?.appId !== inspectorAppId) return;
+      setBlockLog(prev => [{
+        resourceType: 'dom',
+        hostname: event.hostname,
+        url: event.url || event.selector,
+        rule: event.reason,
+        selector: event.selector,
+        ts: Date.now(),
+      }, ...prev].slice(0, 500));
+    });
+    return () => unsub?.();
+  }, [inspectorAppId]);
+
   const saveGlobal = async (updates) => {
     setCfg(prev => ({ ...prev, ...updates }));
     await window.electronAPI?.updateAdBlockConfig(updates);
@@ -547,6 +562,13 @@ export default function AdBlock() {
                   className="input-field flex-1 text-xs"
                 />
                 <button
+                  onClick={() => startPicker(inspectorAppId)}
+                  className="btn-secondary text-xs px-3 py-2 flex-shrink-0"
+                  title="Seleccionar elemento en la ventana abierta"
+                >
+                  <Crosshair size={12} />
+                </button>
+                <button
                   onClick={() => clearLog(inspectorAppId)}
                   className="btn-secondary text-xs px-3 py-2 flex-shrink-0"
                 >
@@ -604,6 +626,7 @@ function LogEntry({ entry }) {
     fetch:  'bg-purple-500/15 text-purple-300',
     stylesheet: 'bg-green-500/15 text-green-300',
     subframe: 'bg-red-500/15 text-red-300',
+    dom:    'bg-emerald-500/15 text-emerald-300',
     other:  'bg-white/[0.06] text-white/35',
   };
   const typeClass = typeColors[entry.resourceType] || typeColors.other;
@@ -616,6 +639,7 @@ function LogEntry({ entry }) {
       <div className="flex-1 min-w-0">
         <p className="text-[11px] text-white/55 truncate font-mono">{entry.hostname || entry.url}</p>
         <p className={`text-[10px] truncate ${ruleColor}`}>{entry.rule}</p>
+        {entry.selector && <p className="text-[10px] truncate text-white/24 font-mono">{entry.selector}</p>}
       </div>
       <span className="text-[9px] text-white/20 flex-shrink-0 mt-0.5">
         {entry.ts ? new Date(entry.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}

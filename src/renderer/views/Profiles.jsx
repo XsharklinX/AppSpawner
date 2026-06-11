@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
   Rocket, Play, Plus, Trash2, CheckSquare, Square, Edit2, Save,
-  Layers3, X, Search, UsersRound,
+  Layers3, X, Search, UsersRound, Shield, Code2, BriefcaseBusiness, UserRound,
 } from 'lucide-react';
 import AppIcon           from '../components/common/AppIcon';
 import Modal             from '../components/common/Modal';
@@ -11,7 +11,7 @@ import { useWorkspaces }  from '../contexts/WorkspaceContext';
 const PROFILE_COLORS = ['#7c3aed','#2563eb','#059669','#dc2626','#d97706','#db2777','#0891b2','#ea580c'];
 const PROFILE_EMOJIS = ['🚀','💼','🏠','🎮','📚','🎨','⚡','🌙','☀️','🎯','🧪','🔒'];
 
-export default function Profiles() {
+export default function Profiles({ onOpenTools }) {
   const { apps, launchApp } = useApps();
   const { profiles, createProfile, updateProfile, deleteProfile } = useWorkspaces();
 
@@ -52,7 +52,7 @@ export default function Profiles() {
                 <div>
                   <h1 className="text-xl font-bold text-white">Perfiles de lanzamiento</h1>
                   <p className="text-sm text-white/38 mt-0.5">
-                    Agrupa apps y abrelas juntas con un solo clic.
+                    Crea flujos de trabajo que abren varias apps en secuencia.
                   </p>
                 </div>
               </div>
@@ -94,6 +94,7 @@ export default function Profiles() {
                   onEdit={() => setEditingId(profile.id)}
                   onDelete={() => deleteProfile(profile.id)}
                   onUpdate={(updates) => updateProfile(profile.id, updates)}
+                  onOpenTools={onOpenTools}
                   isEditing={editingId === profile.id}
                   onStopEdit={() => setEditingId(null)}
                 />
@@ -136,7 +137,7 @@ function Stat({ label, value, icon: Icon }) {
   );
 }
 
-function ProfileCard({ profile, apps, allApps, launching, onLaunch, onEdit, onDelete, onUpdate, isEditing, onStopEdit }) {
+function ProfileCard({ profile, apps, allApps, launching, onLaunch, onEdit, onDelete, onUpdate, onOpenTools, isEditing, onStopEdit }) {
   const [selectedIds, setSelectedIds] = useState(profile.appIds || []);
   const [saving, setSaving] = useState(false);
 
@@ -158,6 +159,10 @@ function ProfileCard({ profile, apps, allApps, launching, onLaunch, onEdit, onDe
     }
   };
 
+  const personalCount = apps.filter(app => (app.security?.profile || 'personal') === 'personal').length;
+  const workCount = apps.filter(app => (app.security?.profile || 'personal') === 'work').length;
+  const firstSecureApp = apps.find(app => app.security?.locked || app.security?.sensitive) || apps[0];
+
   return (
     <div className="glass rounded-2xl p-5 flex flex-col gap-4 border-white/[0.07] shadow-card">
       <div className="flex items-start gap-3">
@@ -170,7 +175,7 @@ function ProfileCard({ profile, apps, allApps, launching, onLaunch, onEdit, onDe
         <div className="flex-1 min-w-0 pt-0.5">
           <h3 className="text-base font-semibold text-white/92 truncate">{profile.name}</h3>
           <p className="text-xs text-white/35 mt-1">
-            {apps.length ? `${apps.length} app${apps.length !== 1 ? 's' : ''} listas para lanzar` : 'Sin apps asignadas'}
+            {apps.length ? `Flujo de ${apps.length} app${apps.length !== 1 ? 's' : ''} en secuencia` : 'Sin apps asignadas'}
           </p>
         </div>
         <div className="flex gap-1.5">
@@ -189,14 +194,25 @@ function ProfileCard({ profile, apps, allApps, launching, onLaunch, onEdit, onDe
         <>
           <div className="min-h-[74px] rounded-xl bg-black/15 border border-white/[0.04] p-3">
             {apps.length > 0 ? (
-              <div className="flex gap-2 flex-wrap">
-                {apps.map(a => (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2 flex-wrap text-[10px] text-white/34">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.04] border border-white/[0.05] px-2 py-1">
+                    <UserRound size={10} /> Personal {personalCount}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.04] border border-white/[0.05] px-2 py-1">
+                    <BriefcaseBusiness size={10} /> Trabajo {workCount}
+                  </span>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                {apps.map((a, index) => (
                   <div key={a.id} className="flex items-center gap-2 text-xs text-white/62 bg-white/[0.045] border border-white/[0.05] rounded-lg px-2.5 py-1.5 max-w-full">
+                    <span className="text-[10px] text-white/30 font-mono">{index + 1}</span>
                     <AppIcon iconType={a.iconType} iconValue={a.iconValue} iconColor={a.iconColor} name={a.name} url={a.url} size={20} />
                     <span className="truncate max-w-[160px]">{a.name}</span>
                     {a.accountLabel && <span className="text-violet-300/80">({a.accountLabel})</span>}
                   </div>
                 ))}
+                </div>
               </div>
             ) : (
               <div className="h-full min-h-[48px] flex items-center text-xs text-white/28">
@@ -205,21 +221,39 @@ function ProfileCard({ profile, apps, allApps, launching, onLaunch, onEdit, onDe
             )}
           </div>
 
-          <button
-            onClick={onLaunch}
-            disabled={launching || apps.length === 0}
-            className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${
-              apps.length === 0
-                ? 'bg-white/[0.04] text-white/24 cursor-default'
-                : 'bg-violet-600 hover:bg-violet-500 text-white active:scale-[0.98] shadow-glow-sm'
-            }`}
-          >
-            {launching
-              ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-              : <Play size={14} fill="currentColor" />
-            }
-            {launching ? 'Lanzando...' : `Lanzar perfil (${apps.length})`}
-          </button>
+          <div className="grid grid-cols-[1fr_auto_auto] gap-2">
+            <button
+              onClick={onLaunch}
+              disabled={launching || apps.length === 0}
+              className={`flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${
+                apps.length === 0
+                  ? 'bg-white/[0.04] text-white/24 cursor-default'
+                  : 'bg-violet-600 hover:bg-violet-500 text-white active:scale-[0.98] shadow-glow-sm'
+              }`}
+            >
+              {launching
+                ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                : <Play size={14} fill="currentColor" />
+              }
+              {launching ? 'Ejecutando...' : `Ejecutar flujo (${apps.length})`}
+            </button>
+            <button
+              onClick={() => firstSecureApp && onOpenTools?.(firstSecureApp, 'security')}
+              disabled={!firstSecureApp}
+              className="px-3 rounded-xl bg-white/[0.04] text-white/35 hover:text-violet-300 hover:bg-violet-600/15 transition-all disabled:opacity-30"
+              title="Centro de seguridad"
+            >
+              <Shield size={14} />
+            </button>
+            <button
+              onClick={() => apps[0] && onOpenTools?.(apps[0], 'scripts')}
+              disabled={!apps[0]}
+              className="px-3 rounded-xl bg-white/[0.04] text-white/35 hover:text-violet-300 hover:bg-violet-600/15 transition-all disabled:opacity-30"
+              title="Scripts del flujo"
+            >
+              <Code2 size={14} />
+            </button>
+          </div>
         </>
       ) : (
         <div className="flex flex-col gap-3">

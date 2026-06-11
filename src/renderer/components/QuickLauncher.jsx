@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Search, X, Command, Settings, Compass, Plus, User, ArrowRight, Database } from 'lucide-react';
+import { Search, X, Command, Settings, Compass, Plus, User, ArrowRight, Database, Play, Shield, Code2, Camera, Stethoscope } from 'lucide-react';
 import AppIcon  from './common/AppIcon';
 import { useApps } from '../contexts/AppContext';
 
@@ -11,7 +11,7 @@ const COMMANDS = [
   { id: 'backup',    label: 'Exportar datos',       hint: 'Crear una copia de seguridad', icon: Database, action: 'backup' },
 ];
 
-export default function QuickLauncher({ onClose, onNavigate }) {
+export default function QuickLauncher({ onClose, onNavigate, onOpenTools }) {
   const { apps, launchApp, badgeCounts } = useApps();
   const [query,  setQuery]  = useState('');
   const [cursor, setCursor] = useState(0);
@@ -32,14 +32,23 @@ export default function QuickLauncher({ onClose, onNavigate }) {
     ).slice(0, 8);
   }, [apps, query, isCommandMode]);
 
+  const appActions = useMemo(() => apps.flatMap(app => ([
+    { id: `launch-${app.id}`, label: `Abrir ${app.name}`, hint: app.url, icon: Play, app, action: 'launch' },
+    { id: `security-${app.id}`, label: `Seguridad de ${app.name}`, hint: 'Vault, 2FA, PIN y autofill', icon: Shield, app, action: 'security' },
+    { id: `scripts-${app.id}`, label: `Scripts de ${app.name}`, hint: 'CSS, JavaScript y permisos', icon: Code2, app, action: 'scripts' },
+    { id: `sessions-${app.id}`, label: `Sesiones de ${app.name}`, hint: 'Snapshots y restauracion', icon: Camera, app, action: 'sessions' },
+    { id: `diagnostics-${app.id}`, label: `Diagnostico de ${app.name}`, hint: 'Carga, permisos y errores', icon: Stethoscope, app, action: 'diagnostics' },
+  ])), [apps]);
+
   const filteredCommands = useMemo(() => {
     if (!isCommandMode) return [];
-    if (!commandQuery) return COMMANDS;
-    return COMMANDS.filter(c =>
+    const commands = [...COMMANDS, ...appActions];
+    if (!commandQuery) return commands.slice(0, 12);
+    return commands.filter(c =>
       c.label.toLowerCase().includes(commandQuery) ||
       c.hint.toLowerCase().includes(commandQuery)
-    );
-  }, [isCommandMode, commandQuery]);
+    ).slice(0, 12);
+  }, [isCommandMode, commandQuery, appActions]);
 
   const items = isCommandMode ? filteredCommands : filteredApps;
 
@@ -60,9 +69,13 @@ export default function QuickLauncher({ onClose, onNavigate }) {
       onNavigate?.(cmd.view);
     } else if (cmd.action === 'backup') {
       await window.electronAPI?.exportBackupFile?.();
+    } else if (cmd.action === 'launch' && cmd.app) {
+      await launchApp(cmd.app.id);
+    } else if (cmd.app && ['security', 'scripts', 'sessions', 'diagnostics'].includes(cmd.action)) {
+      onOpenTools?.(cmd.app, cmd.action);
     }
     onClose();
-  }, [onNavigate, onClose]);
+  }, [onNavigate, onClose, launchApp, onOpenTools]);
 
   const handleKey = (e) => {
     if (e.key === 'Escape')    { onClose(); return; }

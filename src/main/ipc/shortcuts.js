@@ -93,7 +93,14 @@ async function _win32Create(appConfig, type) {
     const shortcutPath = path.join(targetDir, `${appConfig.name}.lnk`);
     const IS_DEV = !app.isPackaged;
     const iconPaths = await ensureAppIcon(appConfig);
-    const operation = fs.existsSync(shortcutPath) ? 'replace' : 'create';
+    const existed = fs.existsSync(shortcutPath);
+    if (existed) {
+      // Recreate the .lnk instead of replacing in-place. Windows is aggressive
+      // about shortcut icon caching, and a fresh link is more reliable when an
+      // app changes from the generic icon to its own generated icon.
+      try { fs.unlinkSync(shortcutPath); } catch {}
+    }
+    const operation = 'create';
 
     let target, args;
     if (IS_DEV) {
@@ -124,7 +131,7 @@ async function _win32Create(appConfig, type) {
       appUserModelId:   `com.appspawner.app.${appConfig.id}`,
     });
 
-    return { success, path: shortcutPath, icon: iconPaths.ico, operation };
+    return { success, path: shortcutPath, icon: iconPaths.ico, operation, recreated: existed };
   } catch (err) {
     return { success: false, error: err.message };
   }

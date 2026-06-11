@@ -77,7 +77,7 @@ export default function AppTools({ app, initialSection = 'scripts', onBack }) {
         </aside>
 
         <div className="flex-1 overflow-y-auto scrollbar-thin px-8 py-6">
-          <div className="max-w-3xl animate-fade-in" key={section}>
+          <div className="max-w-6xl animate-fade-in" key={section}>
             <Content app={app} />
           </div>
         </div>

@@ -73,7 +73,7 @@ function AppShell({ currentView, setCurrentView, selectedCategory, setSelectedCa
       case 'discover':  return <Discover onNavigate={setCurrentView} />;
       case 'create':    return <CreateApp onNavigate={(v) => { setInstallPrefill(null); setCurrentView(v); }} initialData={installPrefill} />;
       case 'settings':  return <Settings />;
-      case 'profiles':  return <Profiles onNavigate={setCurrentView} />;
+      case 'profiles':  return <Profiles onNavigate={setCurrentView} onOpenTools={openTools} />;
       case 'app-tools': return (
         <AppTools
           app={toolsApp}
@@ -120,7 +120,13 @@ function AppShell({ currentView, setCurrentView, selectedCategory, setSelectedCa
             </div>
           </main>
         </div>
-        {showQL && <QuickLauncher onClose={() => setShowQL(false)} onNavigate={(v) => { setShowQL(false); setCurrentView(v); }} />}
+        {showQL && (
+          <QuickLauncher
+            onClose={() => setShowQL(false)}
+            onNavigate={(v) => { setShowQL(false); setCurrentView(v); }}
+            onOpenTools={openTools}
+          />
+        )}
         {showDownloads && <Downloads onClose={() => setShowDownloads(false)} />}
         {showHistory && <BrowsingHistory onClose={() => setShowHistory(false)} />}
       </div>

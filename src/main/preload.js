@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkForUpdates:       () => invoke('updates:check'),
   setSecurityPin:        (pin) => invoke('security:set-pin', pin),
   clearSecurityPin:      (pin) => invoke('security:clear-pin', pin),
+  resetSecurityPin:      (recoveryCode, newPin) => invoke('security:reset-pin-with-recovery', recoveryCode, newPin),
   verifySecurityPin:     (pin) => invoke('security:verify-pin', pin),
 
   // ── SHELL ─────────────────────────────────────────────────────────────────
@@ -130,6 +131,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('adblock:app-toggled', handler);
   },
 
+  onAdBlockDomBlocked: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on('adblock:dom-blocked', handler);
+    return () => ipcRenderer.removeListener('adblock:dom-blocked', handler);
+  },
+
   // ── WORKSPACES ────────────────────────────────────────────────────────────
   getWorkspaces:   ()                   => invoke('workspaces:get-all'),
   createWorkspace: (config)             => invoke('workspaces:create', config),
@@ -216,6 +223,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   listBackups: () => invoke('backups:list'),
   runBackupNow: () => invoke('backups:run-now'),
   runDiagnostics: () => invoke('diagnostics:run'),
+  getMigrationStatus: () => invoke('data:migration-status'),
+  migrateDataNow: () => invoke('data:migrate-now'),
 
   // ── FLAGS ─────────────────────────────────────────────────────────────────
   isElectron: true,

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Play, Settings2, Trash2, Clock, Pin, PinOff, Camera, Code2, Shield, Share2, LogIn, Stethoscope } from 'lucide-react';
+import { Play, Settings2, Trash2, Clock, Pin, PinOff, Camera, Code2, Shield, Share2, LogIn, Stethoscope, KeyRound, LockKeyhole, Network, PanelTop, BadgeCheck } from 'lucide-react';
 import AppIcon               from './AppIcon';
 import Tooltip               from './Tooltip';
 import { useApps }            from '../../contexts/AppContext';
@@ -16,6 +16,7 @@ const AppCard = React.memo(function AppCard({ app, onEdit, onOpenTools }) {
   const [launching,    setLaunching]    = useState(false);
   const [confirm,      setConfirm]      = useState(false);
   const [loginAlert,   setLoginAlert]   = useState(false);
+  const [toolState,    setToolState]    = useState({ scripts: false, vault: false, totp: false });
 
   const { launchApp, uninstallApp, togglePin, isWindowOpen, badgeCounts } = useApps();
   const { t, language } = useI18n();
@@ -24,6 +25,33 @@ const AppCard = React.memo(function AppCard({ app, onEdit, onOpenTools }) {
   const windowOpen     = isWindowOpen(app.id);
   const relativeTime   = formatRelativeTime(app.lastUsed, language);
   const badgeCount     = badgeCounts?.[app.id] || 0;
+
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      window.electronAPI?.getScripts?.(app.id).catch(() => null),
+      window.electronAPI?.listCredentials?.(app.id).catch(() => []),
+      window.electronAPI?.listTotp?.(app.id).catch(() => []),
+    ]).then(([scripts, creds, totp]) => {
+      if (!alive) return;
+      setToolState({
+        scripts: !!scripts && scripts.enabled !== false && !!((scripts.css || '').trim() || (scripts.js || '').trim()),
+        vault: Array.isArray(creds) && creds.length > 0,
+        totp: Array.isArray(totp) && totp.length > 0,
+      });
+    });
+    return () => { alive = false; };
+  }, [app.id]);
+
+  const statusItems = [
+    { key: 'adblock', active: app.adblockEnabled !== false, icon: Shield, label: 'AdBlock' },
+    { key: 'scripts', active: toolState.scripts, icon: Code2, label: 'Scripts' },
+    { key: 'vault', active: toolState.vault, icon: KeyRound, label: 'Vault' },
+    { key: 'totp', active: toolState.totp, icon: BadgeCheck, label: '2FA' },
+    { key: 'pin', active: !!app.security?.locked, icon: LockKeyhole, label: 'PIN' },
+    { key: 'proxy', active: !!app.proxy?.enabled, icon: Network, label: 'Proxy' },
+    { key: 'toolbar', active: !!app.toolbar?.enabled, icon: PanelTop, label: 'Toolbar' },
+  ].filter(item => item.active);
 
   const handleLaunch = useCallback(async (e) => {
     e?.stopPropagation?.();
@@ -76,7 +104,7 @@ const AppCard = React.memo(function AppCard({ app, onEdit, onOpenTools }) {
     <div
       className={`
         relative glass rounded-2xl overflow-hidden cursor-pointer group
-        transition-all duration-200 min-h-[198px]
+        transition-all duration-200 min-h-[164px]
         ${hovered ? 'shadow-card-hover -translate-y-[3px] border-line/[0.12]' : 'shadow-card'}
         ${app.pinned ? 'ring-1 ring-violet-500/25' : ''}
       `}
@@ -114,13 +142,13 @@ const AppCard = React.memo(function AppCard({ app, onEdit, onOpenTools }) {
       )}
 
       {/* ── Contenido ──────────────────────────────────────────────────── */}
-      <div className="relative flex flex-col gap-3 p-4 pt-5 min-h-[198px]">
+      <div className="relative flex flex-col gap-3 p-4 pt-5 min-h-[164px]">
         {/* Ícono */}
         <div className="relative self-start">
           <AppIcon
             iconType={app.iconType} iconValue={app.iconValue}
             iconColor={app.iconColor} name={app.name} url={app.url}
-            size={52}
+            size={42}
             className={`transition-transform duration-200 ${hovered ? 'scale-[1.08]' : ''}`}
           />
           {badgeCount > 0 && (
@@ -144,6 +172,25 @@ const AppCard = React.memo(function AppCard({ app, onEdit, onOpenTools }) {
             )}
           </div>
         </div>
+
+        {statusItems.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {statusItems.slice(0, 5).map(({ key, icon: Icon, label }) => (
+              <span
+                key={key}
+                title={label}
+                className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.035] px-1.5 py-1 text-[9px] font-semibold text-fg/42"
+              >
+                <Icon size={10} /> {label}
+              </span>
+            ))}
+            {statusItems.length > 5 && (
+              <span className="rounded-md border border-white/[0.06] bg-white/[0.035] px-1.5 py-1 text-[9px] font-semibold text-fg/35">
+                +{statusItems.length - 5}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Último uso */}
         <div className="flex items-center gap-1.5 mt-auto border-t border-line/[0.05] pt-3">

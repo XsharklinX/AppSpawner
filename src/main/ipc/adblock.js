@@ -196,6 +196,20 @@ function logBlock(appId, url, resourceType, rule) {
   if (log.length > BLOCK_LOG_MAX) log.splice(0, log.length - BLOCK_LOG_MAX);
 }
 
+function logCosmeticBlock(appId, { selector = '', reason = 'Overlay neutralizado', url = '', hostname = '' } = {}) {
+  if (!blockLog.has(appId)) blockLog.set(appId, []);
+  const log = blockLog.get(appId);
+  log.push({
+    url: url || selector || 'dom://overlay',
+    hostname,
+    resourceType: 'dom',
+    rule: reason,
+    selector,
+    ts: Date.now(),
+  });
+  if (log.length > BLOCK_LOG_MAX) log.splice(0, log.length - BLOCK_LOG_MAX);
+}
+
 function getBlockLog(appId) {
   return (blockLog.get(appId) || []).slice().reverse();
 }
@@ -704,6 +718,14 @@ const COSMETIC_OVERLAYS = `
 [class*="sticky-ad"], [id*="sticky-ad"],
 [class*="floating-ad"], [id*="floating-ad"],
 [class*="fixed-ad"], [id*="fixed-ad"],
+[class*="video-overlay-ad"], [id*="video-overlay-ad"],
+[class*="video_ad"], [id*="video_ad"],
+[class*="vast-ad"], [id*="vast-ad"],
+[class*="vpaid-ad"], [id*="vpaid-ad"],
+[class*="ad-click"], [id*="ad-click"],
+[class*="click-overlay"], [id*="click-overlay"],
+[class*="player-overlay-ad"], [id*="player-overlay-ad"],
+[class*="outstream-ad"], [id*="outstream-ad"],
 [class*="adhesion-ad"], [id*="adhesion"],
 [class*="leaderboard-sticky"], [id*="leaderboard-sticky"],
 .ad-sticky, #ad-sticky, .sticky-banner,
@@ -734,6 +756,12 @@ const COSMETIC_POPUPS = `
 [id*="notif-widget"], [id*="notification-widget"],
 [class*="push-card"], [id*="push-card"],
 /* Fake social notification ads */
+[class*="social-bar"]:not([data-appspawner-ui]),
+[class*="socialbar"]:not([data-appspawner-ui]),
+[id*="social-bar"], [id*="socialbar"],
+[class*="fake-notif"]:not([data-appspawner-ui]),
+[id*="fake-notif"],
+[class*="toast-ad"]:not([data-appspawner-ui]),
 [class*="social-proof-notif"], [class*="sales-notif"],
 [class*="fomo-notification"], [class*="trustedsite-notif"]
 { display:none!important; }
@@ -1087,5 +1115,6 @@ module.exports = {
   getDefaultSubscriptions,
   getAdBlockStats,
   getBlockedCount,
+  logCosmeticBlock,
   isSafeCssSelector,
 };

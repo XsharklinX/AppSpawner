@@ -26,6 +26,15 @@ const BACKUP_ITEMS = [
   { icon: KeyRound, label: 'Credenciales y 2FA cifrados por el sistema' },
 ];
 
+const RELEASE_CHECKS = [
+  'Instalacion limpia, primer arranque y onboarding',
+  'Accesos directos con icono propio y cache de Windows',
+  'Abrir apps desde dashboard, escritorio y taskbar',
+  'PIN, vault, 2FA, scripts, toolbar y automatizaciones',
+  'Backups, import/export y migracion de usuarios antiguos',
+  'SSB con AdBlock en sitios de video y controles estables',
+];
+
 const formatDate = (value) => {
   if (!value) return 'Nunca';
   try {
@@ -55,18 +64,21 @@ export default function Backup() {
   const [diagnostics, setDiagnostics] = useState(null);
   const [portableInfo, setPortableInfo] = useState(null);
   const [updateInfo, setUpdateInfo] = useState(null);
+  const [migration, setMigration] = useState(null);
 
   const loadRuntimeInfo = async () => {
-    const [nextSettings, nextBackups, nextPortable, nextUpdates] = await Promise.all([
+    const [nextSettings, nextBackups, nextPortable, nextUpdates, nextMigration] = await Promise.all([
       window.electronAPI?.getSettings?.(),
       window.electronAPI?.listBackups?.(),
       window.electronAPI?.getPortableInfo?.(),
       window.electronAPI?.checkForUpdates?.(),
+      window.electronAPI?.getMigrationStatus?.(),
     ]);
     if (nextSettings) setSettings(nextSettings);
     if (Array.isArray(nextBackups)) setBackups(nextBackups);
     if (nextPortable) setPortableInfo(nextPortable);
     if (nextUpdates) setUpdateInfo(nextUpdates);
+    if (nextMigration?.success !== false) setMigration(nextMigration);
   };
 
   useEffect(() => {
@@ -165,6 +177,27 @@ export default function Backup() {
     }
   };
 
+  const migrateData = async () => {
+    setDiagBusy(true);
+    try {
+      const result = await window.electronAPI?.migrateDataNow?.();
+      if (result?.success) {
+        setMigration(result.after || result);
+        await runDiagnostics();
+        toast.success(
+          result.migrated ? 'Migracion v3.2 aplicada' : 'Datos ya estaban al dia',
+          `${result.after?.appsChecked ?? result.appsChecked ?? 0} apps revisadas`
+        );
+      } else {
+        toast.error('No se pudo migrar el store', result?.error || '');
+      }
+    } catch (err) {
+      toast.error('No se pudo migrar el store', err.message);
+    } finally {
+      setDiagBusy(false);
+    }
+  };
+
   const healthTone = useMemo(() => {
     const score = diagnostics?.score ?? 100;
     if (score >= 90) return 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20';
@@ -193,6 +226,45 @@ export default function Backup() {
           </div>
         ))}
       </div>
+
+      <section className="glass rounded-xl p-4 border-violet-500/15 bg-violet-500/[0.03]">
+        <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-white/82">QA de version v3.2</p>
+            <p className="text-xs text-white/35 mt-1 max-w-3xl">
+              Esta version queda enfocada en estabilizar instalacion, accesos directos, migracion local y comprobaciones previas a build.
+            </p>
+          </div>
+          <button onClick={migrateData} disabled={diagBusy} className="btn-ghost flex items-center justify-center gap-2 text-sm disabled:opacity-50">
+            {diagBusy ? <RefreshCw size={14} className="animate-spin" /> : <Database size={14} />}
+            Migrar datos
+          </button>
+        </div>
+
+        <div className="grid lg:grid-cols-[0.8fr_1.2fr] gap-3 mt-4">
+          <div className={`rounded-xl border p-3 ${
+            migration?.needed
+              ? 'border-amber-500/20 bg-amber-500/10 text-amber-200'
+              : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200'
+          }`}>
+            <p className="text-xs uppercase tracking-wider opacity-70">Migracion local</p>
+            <p className="text-sm font-semibold mt-1">
+              {migration?.needed ? 'Pendiente de persistir' : 'Store actualizado'}
+            </p>
+            <p className="text-xs opacity-70 mt-1">
+              Esquema {migration?.currentVersion || '3.2.0'} -> {migration?.targetVersion || '3.2.0'} - {migration?.appsNeedingMigration || 0} apps heredadas.
+            </p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-2">
+            {RELEASE_CHECKS.map(item => (
+              <div key={item} className="rounded-xl border border-white/[0.06] bg-white/[0.025] px-3 py-2 flex items-start gap-2">
+                <CheckCircle2 size={14} className="text-violet-300 mt-0.5 flex-shrink-0" />
+                <span className="text-xs text-white/55 leading-relaxed">{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <div className="grid xl:grid-cols-[1.2fr_0.8fr] gap-4">
         <section className="glass rounded-xl p-4 flex flex-col gap-4">
@@ -345,7 +417,7 @@ export default function Backup() {
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <InfoTile label="Version" value={updateInfo?.currentVersion || '3.1.0'} />
+            <InfoTile label="Version" value={updateInfo?.currentVersion || '3.2.0'} />
             <InfoTile label="Canal" value={updateInfo?.channel || 'stable'} />
           </div>
           <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 text-xs text-white/45 leading-relaxed">

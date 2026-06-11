@@ -48,6 +48,11 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
     [apps, openWindows]);
 
   const openCount = openWindows?.size || 0;
+  const profileCounts = useMemo(() => ({
+    all: apps.length,
+    personal: apps.filter(a => (a.security?.profile || 'personal') === 'personal').length,
+    work: apps.filter(a => (a.security?.profile || 'personal') === 'work').length,
+  }), [apps]);
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -107,10 +112,10 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
         {apps.length > 0 && (
           <div className="flex gap-2 mt-3">
             {[
-              { id: 'all', label: 'Todas', icon: Layers3 },
-              { id: 'personal', label: 'Personal', icon: UserRound },
-              { id: 'work', label: 'Trabajo', icon: BriefcaseBusiness },
-            ].map(({ id, label, icon: Icon }) => (
+              { id: 'all', label: 'Todas', icon: Layers3, count: profileCounts.all },
+              { id: 'personal', label: 'Personal', icon: UserRound, count: profileCounts.personal },
+              { id: 'work', label: 'Trabajo', icon: BriefcaseBusiness, count: profileCounts.work },
+            ].map(({ id, label, icon: Icon, count }) => (
               <button
                 key={id}
                 onClick={() => setProfileFilter(id)}
@@ -121,6 +126,11 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
                 }`}
               >
                 <Icon size={12} /> {label}
+                <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] ${
+                  profileFilter === id ? 'bg-violet-400/15 text-violet-100/70' : 'bg-white/[0.04] text-fg/28'
+                }`}>
+                  {count}
+                </span>
               </button>
             ))}
           </div>
@@ -209,7 +219,7 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
             )}
 
             {/* ── Grid principal ─────────────────────────────────────────── */}
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,260px))] justify-start gap-4 animate-fade-in">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,280px))] justify-start gap-3 animate-fade-in">
               {filteredApps.map((app, i) => (
                 <div
                   key={app.id}
@@ -231,7 +241,7 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
         isOpen={!!editingApp}
         onClose={() => setEditingApp(null)}
         title={t('edit_title')}
-        size="md"
+        size="2xl"
       >
         {editingApp && (
           <CreateApp
@@ -249,7 +259,7 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
         isOpen={showWSModal}
         onClose={() => setShowWSModal(false)}
         title="Workspaces"
-        size="sm"
+        size="lg"
       >
         <WorkspaceManager onClose={() => setShowWSModal(false)} />
       </Modal>

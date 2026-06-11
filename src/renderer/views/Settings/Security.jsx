@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { LockKeyhole, Save, ShieldCheck, TimerReset, UsersRound } from 'lucide-react';
+import { Copy, LockKeyhole, Save, ShieldCheck, TimerReset, UsersRound } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 
 export default function Security() {
@@ -7,6 +7,9 @@ export default function Security() {
   const [settings, setSettings] = useState({});
   const [pin, setPin] = useState('');
   const [currentPin, setCurrentPin] = useState('');
+  const [recoveryCode, setRecoveryCode] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [resetPin, setResetPin] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -19,6 +22,7 @@ export default function Security() {
       const result = await window.electronAPI?.setSecurityPin?.(pin);
       if (result?.success) {
         setPin('');
+        setRecoveryCode(result.recoveryCode || '');
         setSettings(await window.electronAPI?.getSettings?.());
         toast.success('PIN configurado', 'Las apps sensibles ya pueden requerir desbloqueo.');
       } else {
@@ -35,6 +39,7 @@ export default function Security() {
       const result = await window.electronAPI?.clearSecurityPin?.(currentPin);
       if (result?.success) {
         setCurrentPin('');
+        setRecoveryCode('');
         setSettings(await window.electronAPI?.getSettings?.());
         toast.success('PIN eliminado');
       } else {
@@ -43,6 +48,30 @@ export default function Security() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const resetWithRecovery = async () => {
+    setBusy(true);
+    try {
+      const result = await window.electronAPI?.resetSecurityPin?.(resetCode, resetPin);
+      if (result?.success) {
+        setResetCode('');
+        setResetPin('');
+        setRecoveryCode(result.recoveryCode || '');
+        setSettings(await window.electronAPI?.getSettings?.());
+        toast.success('PIN restablecido', 'Guarda el nuevo codigo de recuperacion.');
+      } else {
+        toast.error('No se pudo restablecer el PIN', result?.error || '');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copyRecoveryCode = () => {
+    if (!recoveryCode) return;
+    navigator.clipboard?.writeText(recoveryCode);
+    toast.success('Codigo copiado');
   };
 
   const update = async (updates) => {
@@ -107,6 +136,49 @@ export default function Security() {
                 Eliminar
               </button>
             </div>
+          </div>
+        </div>
+
+        {recoveryCode && (
+          <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.06] p-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-amber-200">Codigo de recuperacion nuevo</p>
+              <p className="text-[11px] text-amber-100/55 mt-1">
+                Guardalo fuera de AppSpawner. Solo se muestra ahora y permite cambiar el PIN si lo olvidas.
+              </p>
+              <p className="font-mono text-sm text-amber-100 mt-2 tracking-widest">{recoveryCode}</p>
+            </div>
+            <button onClick={copyRecoveryCode} className="btn-ghost text-sm flex items-center gap-2 flex-shrink-0">
+              <Copy size={13} /> Copiar
+            </button>
+          </div>
+        )}
+
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
+          <p className="text-xs text-white/35 mb-2">Recuperar PIN con codigo</p>
+          <div className="grid md:grid-cols-[1fr_160px_auto] gap-2">
+            <input
+              type="text"
+              value={resetCode}
+              onChange={e => setResetCode(e.target.value.toUpperCase().slice(0, 24))}
+              placeholder="AS-XXXX-XXXX-XXXX"
+              className="input-field text-sm font-mono"
+            />
+            <input
+              type="password"
+              inputMode="numeric"
+              value={resetPin}
+              onChange={e => setResetPin(e.target.value.replace(/\D/g, '').slice(0, 12))}
+              placeholder="Nuevo PIN"
+              className="input-field text-sm"
+            />
+            <button
+              onClick={resetWithRecovery}
+              disabled={busy || resetCode.length < 8 || resetPin.length < 4}
+              className="btn-ghost text-sm disabled:opacity-40"
+            >
+              Restablecer
+            </button>
           </div>
         </div>
       </section>

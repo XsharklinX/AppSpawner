@@ -59,7 +59,11 @@ function PasswordsTab({ app }) {
     const r = await window.electronAPI?.autofillById(app.id, credId);
     setFilling(null);
     if (r?.success) {
-      setMsg({ ok: true, text: `Rellenado: usuario ${r.filledUser ? '✓' : '✗'}, contraseña ${r.filledPass ? '✓' : '✗'}` });
+      const parts = [
+        r.filledUser ? 'usuario detectado' : 'usuario no detectado',
+        r.filledPass ? 'contrasena detectada' : 'contrasena no detectada',
+      ];
+      setMsg({ ok: !r.warning, text: r.warning || `Autofill aplicado: ${parts.join(', ')}` });
     } else {
       setMsg({ ok: false, text: r?.error || 'Error al rellenar' });
     }
@@ -418,9 +422,9 @@ export default function SecurityCenter({ app }) {
   const [tab, setTab] = useState('passwords');
 
   const TABS = [
-    { id: 'passwords', label: '🔑 Contraseñas' },
-    { id: 'otp',       label: '🛡 2FA / OTP'   },
-    { id: 'import',    label: '📥 Importar'    },
+    { id: 'passwords', label: 'Contrasenas' },
+    { id: 'otp',       label: '2FA / OTP'   },
+    { id: 'import',    label: 'Importar'    },
   ];
 
   return (

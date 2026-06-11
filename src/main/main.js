@@ -33,7 +33,7 @@ const { registerSessionHandlers }    = require('./ipc/sessions');
 const { registerScriptHandlers, readScripts } = require('./ipc/scripts');
 const { registerCredentialHandlers } = require('./ipc/credentials');
 const { registerTotpHandlers }       = require('./ipc/totp');
-const { registerAdBlockHandlers, applyAdBlockToSession, getCosmeticCssForUrl, isBlockedDomain } = require('./ipc/adblock');
+const { registerAdBlockHandlers, applyAdBlockToSession, getCosmeticCssForUrl, isBlockedDomain, logCosmeticBlock } = require('./ipc/adblock');
 const { attachDownloadInterceptor, registerDownloadHandlers } = require('./ipc/downloads');
 const { recordNavigation, registerHistoryHandlers } = require('./ipc/history');
 const { v4: uuidv4 }                 = require('uuid');
@@ -301,6 +301,9 @@ function importBackupPayload(payload, { mode = 'merge' } = {}) {
         profiles: mergeById(current.profiles, incoming.profiles),
       };
 
+  next.apps = Array.isArray(next.apps) && typeof store.normalizeApp === 'function'
+    ? next.apps.map(store.normalizeApp)
+    : (Array.isArray(next.apps) ? next.apps : []);
   store.write(next);
   const files = payload.files || {};
   const written = {
@@ -453,9 +456,27 @@ function collectCorruptJsonFiles(relativeDir) {
 async function runHealthDiagnostics() {
   const data = store.read();
   const settings = data.settings || {};
+  const migration = typeof store.getMigrationStatus === 'function' ? store.getMigrationStatus() : null;
   const issues = [];
   const seenIds = new Set();
   const seenUrls = new Map();
+
+  if (migration?.error) {
+    issues.push({
+      severity: 'error',
+      type: 'migration-error',
+      message: `No se pudo leer el store local para migracion: ${migration.error}`,
+      path: migration.storePath,
+    });
+  } else if (migration?.needed) {
+    issues.push({
+      severity: 'warning',
+      type: 'migration-needed',
+      message: `Datos locales en esquema ${migration.currentVersion}. Ejecuta la migracion v${migration.targetVersion}.`,
+      path: migration.storePath,
+      action: 'migrate-data',
+    });
+  }
 
   for (const appConfig of data.apps || []) {
     if (!appConfig.id || seenIds.has(appConfig.id)) {
@@ -549,6 +570,7 @@ async function runHealthDiagnostics() {
       errors,
       warnings,
     },
+    migration,
     issues,
   };
 }
@@ -617,6 +639,57 @@ function hashSecurityPin(pin) {
   const salt = crypto.randomBytes(16).toString('hex');
   const hash = crypto.pbkdf2Sync(String(pin || ''), salt, 120000, 32, 'sha256').toString('hex');
   return { salt, hash };
+}
+
+function normalizeRecoveryCode(code) {
+  return String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function generateRecoveryCode() {
+  const raw = crypto.randomBytes(9).toString('base64url').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+  return `AS-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`;
+}
+
+function verifyRecoveryCode(code, settings = store.read().settings) {
+  if (!settings.securityRecoveryHash || !settings.securityRecoverySalt) return false;
+  const normalized = normalizeRecoveryCode(code);
+  const hash = crypto
+    .pbkdf2Sync(normalized, settings.securityRecoverySalt, 120000, 32, 'sha256')
+    .toString('hex');
+  return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(settings.securityRecoveryHash, 'hex'));
+}
+
+function buildLoadErrorPage({ appName, targetUrl, errorCode, errorDesc }) {
+  const esc = value => String(value || '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[ch]));
+  const retryUrl = JSON.stringify(String(targetUrl || ''));
+  const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${esc(appName)} - error de carga</title>
+  <style>
+    body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0b10;color:#f5f3ff;font-family:Inter,Segoe UI,Arial,sans-serif}
+    main{width:min(560px,calc(100vw - 48px));border:1px solid rgba(255,255,255,.1);border-radius:18px;background:#14141b;padding:28px;box-shadow:0 20px 70px rgba(0,0,0,.45)}
+    h1{font-size:20px;margin:0 0 8px} p{color:rgba(245,243,255,.62);line-height:1.5;margin:8px 0}
+    code{display:block;margin:16px 0;padding:12px;border-radius:12px;background:rgba(255,255,255,.05);color:#c4b5fd;word-break:break-all}
+    button{border:0;border-radius:12px;background:#7c3aed;color:white;font-weight:700;padding:11px 16px;cursor:pointer}
+    .meta{font-size:12px;color:rgba(245,243,255,.38)}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>No se pudo cargar ${esc(appName)}</h1>
+    <p>La ventana no quedo en blanco: Electron reporto un fallo de carga. Reintenta o revisa el diagnostico de la app.</p>
+    <code>${esc(targetUrl)}</code>
+    <p class="meta">Error ${esc(errorCode)}: ${esc(errorDesc)}</p>
+    <button onclick="location.href=${retryUrl}">Reintentar</button>
+  </main>
+</body>
+</html>`;
+  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
 
 function createAppWindow(appConfig, options = {}) {
@@ -862,6 +935,12 @@ function createAppWindow(appConfig, options = {}) {
           appId: id, appName: name, url: validatedURL, errorCode, errorDesc,
         });
       }
+      win.loadURL(buildLoadErrorPage({
+        appName: name,
+        targetUrl: validatedURL || appUrl,
+        errorCode,
+        errorDesc,
+      })).catch(() => {});
     });
   }
 
@@ -1110,6 +1189,13 @@ function createAppWindow(appConfig, options = {}) {
   };
   ipcMain.on('ssb:element-picked', onElementPicked);
 
+  const onCosmeticBlocked = (event, payload = {}) => {
+    if (event.sender !== win.webContents) return;
+    logCosmeticBlock(id, payload);
+    mainWindow?.webContents.send('adblock:dom-blocked', { appId: id, ...payload });
+  };
+  ipcMain.on('ssb:cosmetic-blocked', onCosmeticBlocked);
+
   // Guardar snapshot de sesión desde la toolbar SSB
   const onSaveSnapshot = async (event) => {
     if (event.sender !== win.webContents || win.isDestroyed()) return;
@@ -1145,6 +1231,7 @@ function createAppWindow(appConfig, options = {}) {
     ipcMain.removeListener('ssb:open-devtools', onOpenDevTools);
     ipcMain.removeListener('ssb:toggle-adblock', onToggleAdBlock);
     ipcMain.removeListener('ssb:element-picked', onElementPicked);
+    ipcMain.removeListener('ssb:cosmetic-blocked', onCosmeticBlocked);
     ipcMain.removeListener('ssb:save-snapshot', onSaveSnapshot);
     ipcMain.removeListener('ssb:update-toolbar-buttons', onUpdateToolbarButtons);
     appWindows.delete(id);
@@ -1242,10 +1329,14 @@ function registerIpcHandlers() {
     }
     const data = store.read();
     const { salt, hash } = hashSecurityPin(normalized);
+    const recoveryCode = generateRecoveryCode();
+    const recoveryHash = hashSecurityPin(normalizeRecoveryCode(recoveryCode));
     data.settings.securityPinSalt = salt;
     data.settings.securityPinHash = hash;
+    data.settings.securityRecoverySalt = recoveryHash.salt;
+    data.settings.securityRecoveryHash = recoveryHash.hash;
     store.write(data);
-    return { success: true };
+    return { success: true, recoveryCode };
   });
 
   ipcMain.handle('security:clear-pin', (_e, pin) => {
@@ -1255,8 +1346,30 @@ function registerIpcHandlers() {
     }
     data.settings.securityPinSalt = null;
     data.settings.securityPinHash = null;
+    data.settings.securityRecoverySalt = null;
+    data.settings.securityRecoveryHash = null;
     store.write(data);
     return { success: true };
+  });
+
+  ipcMain.handle('security:reset-pin-with-recovery', (_e, recoveryCode, newPin) => {
+    const normalizedPin = String(newPin || '').trim();
+    if (!/^\d{4,12}$/.test(normalizedPin)) {
+      return { success: false, error: 'El PIN nuevo debe tener entre 4 y 12 digitos' };
+    }
+    const data = store.read();
+    if (!verifyRecoveryCode(recoveryCode, data.settings)) {
+      return { success: false, error: 'Codigo de recuperacion invalido' };
+    }
+    const { salt, hash } = hashSecurityPin(normalizedPin);
+    const nextRecoveryCode = generateRecoveryCode();
+    const recoveryHash = hashSecurityPin(normalizeRecoveryCode(nextRecoveryCode));
+    data.settings.securityPinSalt = salt;
+    data.settings.securityPinHash = hash;
+    data.settings.securityRecoverySalt = recoveryHash.salt;
+    data.settings.securityRecoveryHash = recoveryHash.hash;
+    store.write(data);
+    return { success: true, recoveryCode: nextRecoveryCode };
   });
 
   ipcMain.handle('security:verify-pin', (_e, pin) => {
@@ -1477,7 +1590,7 @@ function registerIpcHandlers() {
           const parsed = new URL(a.url);
           if (!['http:', 'https:'].includes(parsed.protocol)) { skipped++; continue; }
         } catch { skipped++; continue; }
-        data.apps.push({ ...a });
+        data.apps.push(typeof store.normalizeApp === 'function' ? store.normalizeApp(a) : { ...a });
         added++;
       }
       store.write(data);
@@ -1525,6 +1638,22 @@ function registerIpcHandlers() {
   ipcMain.handle('diagnostics:run', async () => {
     try {
       return { success: true, ...(await runHealthDiagnostics()) };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('data:migration-status', () => {
+    try {
+      return { success: true, ...(store.getMigrationStatus?.() || {}) };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('data:migrate-now', () => {
+    try {
+      return store.migrate?.() || { success: false, error: 'Migracion no disponible' };
     } catch (err) {
       return { success: false, error: err.message };
     }
@@ -1609,6 +1738,12 @@ app.whenReady().then(() => {
   const { settings } = store.read();
   if (settings.autoLaunch) applyAutoLaunch(true);
   try { runAutomaticBackupIfNeeded(); } catch (err) { console.error('[Backup] Error:', err.message); }
+  try {
+    const migration = store.migrate?.();
+    if (migration?.migrated) console.log('[Store] Migracion v3.2 aplicada.');
+  } catch (err) {
+    console.error('[Store] Migracion v3.2 fallida:', err.message);
+  }
 
   const launchAppId = getLaunchAppId();
 

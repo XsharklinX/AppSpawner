@@ -111,6 +111,26 @@ function verifySecurityPin(pin, settings = {}) {
   }
 }
 
+function mergeNestedAppUpdates(current, updates) {
+  const next = { ...current, ...updates };
+  for (const key of ['proxy', 'screenshotConfig', 'windowConfig', 'toolbar', 'shortcuts', 'security']) {
+    if (updates[key] && typeof updates[key] === 'object' && !Array.isArray(updates[key])) {
+      next[key] = { ...(current[key] || {}), ...updates[key] };
+    }
+  }
+  if (updates.automation && typeof updates.automation === 'object') {
+    next.automation = {
+      ...(current.automation || {}),
+      ...updates.automation,
+      onOpen: {
+        ...(current.automation?.onOpen || {}),
+        ...(updates.automation.onOpen || {}),
+      },
+    };
+  }
+  return next;
+}
+
 /**
  * Calcula el tamaño de la partición de una app de forma asíncrona.
  */
@@ -321,7 +341,8 @@ function registerAppManagerHandlers(ipcMain, store, createAppWindow, appWindows)
     if (safeUpdates.name && safeUpdates.name !== previousApp.name) {
       removeNativeShortcuts(previousApp);
     }
-    data.apps[index] = { ...data.apps[index], ...safeUpdates };
+    const merged = mergeNestedAppUpdates(data.apps[index], safeUpdates);
+    data.apps[index] = typeof store.normalizeApp === 'function' ? store.normalizeApp(merged) : merged;
     store.write(data);
     return data.apps[index];
   });
