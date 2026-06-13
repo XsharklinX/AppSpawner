@@ -66,7 +66,7 @@ export default function ShortcutInput({ value, onChange, placeholder = 'Sin asig
           flex-1 flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors text-left
           border ${recording
             ? 'border-violet-500/50 bg-violet-600/10 text-violet-300'
-            : 'border-white/[0.08] bg-white/[0.03] text-white/60 hover:border-white/[0.16]'}
+            : 'border-line/[0.08] bg-overlay/[0.03] text-fg/60 hover:border-line/[0.16]'}
         `}
       >
         <Keyboard size={12} className="flex-shrink-0 opacity-50" />
@@ -75,12 +75,12 @@ export default function ShortcutInput({ value, onChange, placeholder = 'Sin asig
         ) : segments.length > 0 ? (
           segments.map((seg, i) => (
             <React.Fragment key={i}>
-              {i > 0 && <span className="text-white/20">+</span>}
-              <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/[0.08] text-[11px]">{displayLabel(seg)}</kbd>
+              {i > 0 && <span className="text-fg/20">+</span>}
+              <kbd className="px-1.5 py-0.5 rounded bg-overlay/[0.06] border border-line/[0.08] text-[11px]">{displayLabel(seg)}</kbd>
             </React.Fragment>
           ))
         ) : (
-          <span className="text-white/25">{placeholder}</span>
+          <span className="text-fg/25">{placeholder}</span>
         )}
       </button>
       {value && (
@@ -88,7 +88,7 @@ export default function ShortcutInput({ value, onChange, placeholder = 'Sin asig
           type="button"
           onClick={() => onChange('')}
           title="Quitar atajo"
-          className="p-1.5 rounded-lg text-white/20 hover:text-rose-400 hover:bg-rose-500/10 transition-colors flex-shrink-0"
+          className="p-1.5 rounded-lg text-fg/20 hover:text-rose-400 hover:bg-rose-500/10 transition-colors flex-shrink-0"
         >
           <X size={12} />
         </button>

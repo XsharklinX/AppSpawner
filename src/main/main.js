@@ -33,17 +33,20 @@ const { registerSessionHandlers }    = require('./ipc/sessions');
 const { registerScriptHandlers, readScripts } = require('./ipc/scripts');
 const { registerCredentialHandlers } = require('./ipc/credentials');
 const { registerTotpHandlers }       = require('./ipc/totp');
-const { registerAdBlockHandlers, applyAdBlockToSession, getCosmeticCssForUrl, isBlockedDomain, logCosmeticBlock } = require('./ipc/adblock');
+const { registerAdBlockHandlers, applyAdBlockForApp, getCosmeticCssForUrl, isBlockedDomain, logCosmeticBlock, recordBlockedNavigation } = require('./ipc/adblock');
 const { attachDownloadInterceptor, registerDownloadHandlers } = require('./ipc/downloads');
 const { recordNavigation, registerHistoryHandlers } = require('./ipc/history');
 const { v4: uuidv4 }                 = require('uuid');
 const { ensureAppIcon }              = require('./icon-utils');
+const { registerCrashLogging }       = require('./crash-logger');
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
 const IS_DEV = !app.isPackaged;
 const IS_MAC = process.platform === 'darwin';
 const IS_WIN = process.platform === 'win32';
+
+registerCrashLogging();
 
 // Dominios de OAuth/auth que deben navegar dentro del SSB (no abrirse en navegador externo)
 const AUTH_DOMAINS = [
@@ -75,6 +78,15 @@ let mainWindow   = null;
 let tray         = null;
 let ipcHandlersRegistered = false;
 let trayRefreshRegistered = false;
+
+// Límite de reglas cosméticas guardadas por app vía el element picker — cada
+// regla se persiste en el store, así que se acota para no inflar el JSON.
+const MAX_APP_COSMETIC_RULES = 300;
+
+// Throttle de notificaciones "adblock:page-broken" al dashboard: si un sitio
+// falla repetidamente (recargas/retries), evita inundar al usuario de avisos.
+const PAGE_BROKEN_NOTIFY_INTERVAL_MS = 10000;
+const lastPageBrokenNotify = new Map(); // appId → timestamp
 
 // ── Utilidades ────────────────────────────────────────────────────────────────
 
@@ -593,6 +605,8 @@ function createMainWindow() {
       nodeIntegration:  false,
       contextIsolation: true,
       webSecurity:      true,
+      // sandbox:false porque preload.js usa módulos de Node (fs/path) directamente;
+      // contextIsolation:true ya evita que el renderer toque el contexto del preload.
       sandbox:          false,
     },
   });
@@ -719,6 +733,7 @@ function createAppWindow(appConfig, options = {}) {
       enabled: (_initSettings.adblockEnabled ?? true) && (appConfig.adblockEnabled ?? true),
       annoyances: _initSettings.adblockAnnoyances ?? true,
       cosmetic: _initSettings.adblockCosmetic ?? true,
+      overlayMode: appConfig.adblockOverlayMode ?? 'normal',
     },
     indicators: {
       adblock: (_initSettings.adblockEnabled ?? true) && (appConfig.adblockEnabled ?? true),
@@ -740,6 +755,8 @@ function createAppWindow(appConfig, options = {}) {
       nodeIntegration:  false,
       contextIsolation: true,
       webSecurity:      true,
+      // sandbox:false porque ssb-preload.js usa módulos de Node (fs/path) directamente;
+      // contextIsolation:true ya evita que el sitio remoto toque el contexto del preload.
       sandbox:          false,
       // Inyectar el preload también en iframes (incl. cross-origin): los reproductores
       // de video embebidos de terceros son donde suelen vivir los "social bars" de
@@ -812,7 +829,13 @@ function createAppWindow(appConfig, options = {}) {
           },
         };
       }
-      if (isBlockedDomain(targetUrl)) return { action: 'deny' };
+      if (isBlockedDomain(targetUrl)) {
+        recordBlockedNavigation(id, targetUrl, 'popup');
+        if (!win.isDestroyed()) {
+          win.webContents.send('ssb:show-toast', { message: `Popup bloqueado: ${u.hostname}`, type: 'warning' });
+        }
+        return { action: 'deny' };
+      }
     } catch {}
     if (/^https?:\/\//i.test(targetUrl)) {
       const now = Date.now();
@@ -844,6 +867,10 @@ function createAppWindow(appConfig, options = {}) {
       // Esto evita que anuncios de video/popup redirijan al browser del sistema
       if (isBlockedDomain(navUrl)) {
         event.preventDefault();
+        recordBlockedNavigation(id, navUrl, 'redirect');
+        if (!win.isDestroyed()) {
+          win.webContents.send('ssb:show-toast', { message: `Redirect bloqueado: ${nav.hostname}`, type: 'warning' });
+        }
         return;
       }
       // Dominio diferente desconocido → abrir en navegador externo (link del usuario)
@@ -857,30 +884,11 @@ function createAppWindow(appConfig, options = {}) {
   // Ad Blocker: configurar interceptor en la sesión de esta app
   {
     const { settings } = store.read();
-    const globalEnabled    = settings.adblockEnabled    ?? true;
-    const globalCosmetic   = settings.adblockCosmetic   ?? true;
-    const globalAggressive = settings.adblockAggressive ?? true;
-    const globalAnnoyances = settings.adblockAnnoyances ?? true;
-    const appEnabled         = appConfig.adblockEnabled         ?? true;
-    const customRules        = appConfig.adblockCustomRules      ?? [];
-    const cosmeticRules      = appConfig.adblockCosmeticRules    ?? [];
-    const filterCategories   = appConfig.adblockFilterCategories ?? null;
-    const aggressiveOverride = appConfig.adblockAggressiveOverride ?? null;
-    const effectiveAggressive = aggressiveOverride !== null && aggressiveOverride !== undefined
-      ? aggressiveOverride
-      : globalAggressive;
-    const shouldBlock = globalEnabled && appEnabled;
-    const sess        = electronSession.fromPartition(`persist:app_${id}`);
-    applyAdBlockToSession(sess, id, {
-      enabled: shouldBlock,
-      customRules,
-      aggressive: effectiveAggressive,
-      annoyances: globalAnnoyances,
-      filterCategories,
-      // Las notificaciones del navegador están bloqueadas por defecto (son el principal
-      // vector de spam de "social bars"); el usuario puede habilitarlas por app para
-      // recibir avisos nativos del SO de apps de confianza (correo, chat, etc.)
-      notificationsAllowed: appConfig.notificationsEnabled === true,
+    const globalCosmetic = settings.adblockCosmetic ?? true;
+    const cosmeticRules    = appConfig.adblockCosmeticRules    ?? [];
+    const filterCategories = appConfig.adblockFilterCategories ?? null;
+    const shouldBlock = (settings.adblockEnabled ?? true) && (appConfig.adblockEnabled ?? true);
+    const sess = applyAdBlockForApp(id, appConfig, settings, {
       onPermissionRequest: (permission, granted) => recordPermission(id, permission, granted),
     });
 
@@ -930,7 +938,10 @@ function createAppWindow(appConfig, options = {}) {
     win.webContents.on('did-fail-load', (_ev, errorCode, errorDesc, validatedURL, isMainFrame) => {
       if (!isMainFrame || errorCode === -3) return; // -3 = ERR_ABORTED (navegacion usuario)
       recordLoadError(id, { url: validatedURL, errorCode, errorDesc });
-      if (shouldBlock) {
+      const now = Date.now();
+      const last = lastPageBrokenNotify.get(id) || 0;
+      if (shouldBlock && now - last >= PAGE_BROKEN_NOTIFY_INTERVAL_MS) {
+        lastPageBrokenNotify.set(id, now);
         mainWindow?.webContents.send('adblock:page-broken', {
           appId: id, appName: name, url: validatedURL, errorCode, errorDesc,
         });
@@ -996,12 +1007,7 @@ function createAppWindow(appConfig, options = {}) {
         d.apps[idx].adblockEnabled = !(d.apps[idx].adblockEnabled ?? true);
         store.write(d);
         const { settings: s } = store.read();
-        applyAdBlockToSession(electronSession.fromPartition(`persist:app_${id}`), id, {
-          enabled: (s.adblockEnabled ?? true) && d.apps[idx].adblockEnabled,
-          customRules: d.apps[idx].adblockCustomRules || [],
-          aggressive:  d.apps[idx].adblockAggressiveOverride ?? (s.adblockAggressive ?? true),
-          annoyances:  s.adblockAnnoyances ?? true,
-          filterCategories: d.apps[idx].adblockFilterCategories ?? null,
+        applyAdBlockForApp(id, d.apps[idx], s, {
           onPermissionRequest: (permission, granted) => recordPermission(id, permission, granted),
         });
         const enabled = d.apps[idx].adblockEnabled;
@@ -1154,16 +1160,7 @@ function createAppWindow(appConfig, options = {}) {
     appData.apps[appIndex].adblockEnabled = !current;
     store.write(appData);
     const { settings } = store.read();
-    const sess = electronSession.fromPartition(`persist:app_${id}`);
-    const globalEnabled    = settings.adblockEnabled    ?? true;
-    const globalAggressive = settings.adblockAggressive ?? true;
-    const globalAnnoyances = settings.adblockAnnoyances ?? true;
-    applyAdBlockToSession(sess, id, {
-      enabled: globalEnabled && appData.apps[appIndex].adblockEnabled,
-      customRules: appData.apps[appIndex].adblockCustomRules || [],
-      aggressive:  appData.apps[appIndex].adblockAggressiveOverride ?? globalAggressive,
-      annoyances:  globalAnnoyances,
-      filterCategories: appData.apps[appIndex].adblockFilterCategories ?? null,
+    applyAdBlockForApp(id, appData.apps[appIndex], settings, {
       onPermissionRequest: (permission, granted) => recordPermission(id, permission, granted),
     });
     const newEnabled = appData.apps[appIndex].adblockEnabled;
@@ -1172,6 +1169,32 @@ function createAppWindow(appConfig, options = {}) {
     if (newEnabled) win.webContents.reload();
   };
   ipcMain.on('ssb:toggle-adblock', onToggleAdBlock);
+
+  // "Esta pagina se rompio": pausa el AdBlock de esta app, registra el evento
+  // en el panel de diagnostico y recarga para que el usuario vea el resultado.
+  const onReportBrokenPage = (event) => {
+    if (event.sender !== win.webContents || win.isDestroyed()) return;
+    const appData  = store.read();
+    const appIndex = appData.apps.findIndex(a => a.id === id);
+    if (appIndex === -1) return;
+    recordLoadError(id, {
+      url: win.webContents.getURL(),
+      errorCode: 'user-report',
+      errorDesc: 'El usuario reportó que la página se veía rota',
+    });
+    if (appData.apps[appIndex].adblockEnabled ?? true) {
+      appData.apps[appIndex].adblockEnabled = false;
+      store.write(appData);
+      const { settings } = store.read();
+      applyAdBlockForApp(id, appData.apps[appIndex], settings, {
+        onPermissionRequest: (permission, granted) => recordPermission(id, permission, granted),
+      });
+      event.sender.send('adblock:status-changed', { enabled: false });
+      mainWindow?.webContents.send('adblock:app-toggled', { appId: id, enabled: false });
+    }
+    win.webContents.reload();
+  };
+  ipcMain.on('ssb:report-broken-page', onReportBrokenPage);
 
   // Element picker: cuando el SSB elige un elemento lo registramos como regla cosmetica
   const onElementPicked = (event, { selector, hostname } = {}) => {
@@ -1182,7 +1205,11 @@ function createAppWindow(appConfig, options = {}) {
     const rule = hostname ? `${hostname}##${selector}` : `##${selector}`;
     const existing = pickData.apps[pickIndex].adblockCosmeticRules || [];
     if (!existing.includes(rule)) {
-      pickData.apps[pickIndex].adblockCosmeticRules = [...existing, rule];
+      const updated = [...existing, rule];
+      // Acotar a las reglas más recientes para no inflar el JSON del store indefinidamente
+      pickData.apps[pickIndex].adblockCosmeticRules = updated.length > MAX_APP_COSMETIC_RULES
+        ? updated.slice(updated.length - MAX_APP_COSMETIC_RULES)
+        : updated;
       store.write(pickData);
       mainWindow?.webContents.send('adblock:cosmetic-rule-added', { appId: id, rule });
     }
@@ -1211,7 +1238,7 @@ function createAppWindow(appConfig, options = {}) {
   ipcMain.on('ssb:save-snapshot', onSaveSnapshot);
 
   // Actualizar botones de la toolbar desde el editor SSB
-  const VALID_TOOLBAR_BTNS = ['back','forward','reload','home','pip','notes','devtools','shield','picker','snapshot','settings'];
+  const VALID_TOOLBAR_BTNS = ['back','forward','reload','home','pip','notes','devtools','shield','picker','snapshot','settings','broken'];
   const onUpdateToolbarButtons = (event, buttons) => {
     if (event.sender !== win.webContents || win.isDestroyed()) return;
     const safe = Array.isArray(buttons) ? buttons.filter(b => VALID_TOOLBAR_BTNS.includes(b)) : [];
@@ -1230,6 +1257,7 @@ function createAppWindow(appConfig, options = {}) {
     ipcMain.removeListener('ssb:toggle-pip-window', onTogglePipWindow);
     ipcMain.removeListener('ssb:open-devtools', onOpenDevTools);
     ipcMain.removeListener('ssb:toggle-adblock', onToggleAdBlock);
+    ipcMain.removeListener('ssb:report-broken-page', onReportBrokenPage);
     ipcMain.removeListener('ssb:element-picked', onElementPicked);
     ipcMain.removeListener('ssb:cosmetic-blocked', onCosmeticBlocked);
     ipcMain.removeListener('ssb:save-snapshot', onSaveSnapshot);
@@ -1289,6 +1317,7 @@ function registerIpcHandlers() {
     const i = d.apps.findIndex(a => a.id === appId);
     if (i === -1) return;
     d.apps[i].timeSpentMs = (d.apps[i].timeSpentMs || 0) + Math.round(ms);
+    store.recordDailyUsage?.(d.apps[i], { timeMs: Math.round(ms) });
     store.write(d);
   });
 

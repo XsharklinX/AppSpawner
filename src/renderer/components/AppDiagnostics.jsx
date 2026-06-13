@@ -13,6 +13,7 @@ const ERROR_NAMES = {
   '-109': 'Dirección inaccesible',
   '-201': 'Certificado inválido',
   '-202': 'Certificado caducado',
+  'user-report': 'Reportada por el usuario (AdBlock pausado)',
 };
 
 function errorLabel(code, desc) {

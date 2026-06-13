@@ -19,12 +19,12 @@ export default function Appearance() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h2 className="text-base font-semibold text-white mb-0.5">{t('set_appearance')}</h2>
-        <p className="text-sm text-white/35">Temas predefinidos y editor visual de colores.</p>
+        <h2 className="text-base font-semibold text-fg mb-0.5">{t('set_appearance')}</h2>
+        <p className="text-sm text-fg/35">Temas predefinidos y editor visual de colores.</p>
       </div>
 
       <div className="flex flex-col gap-2.5">
-        <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider">Temas del dashboard</h3>
+        <h3 className="text-xs font-semibold text-fg/40 uppercase tracking-wider">Temas del dashboard</h3>
         <div className="grid grid-cols-2 gap-3">
           {Object.entries(presets).map(([id, palette]) => {
             const meta = THEME_META[id] || THEME_META.dark;
@@ -46,8 +46,8 @@ export default function Appearance() {
       <div className="glass rounded-2xl p-4 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-white/80">Tema custom</h3>
-            <p className="text-xs text-white/35">Ajusta base, tarjetas, superficies y acento.</p>
+            <h3 className="text-sm font-semibold text-fg/80">Tema custom</h3>
+            <p className="text-xs text-fg/35">Ajusta base, tarjetas, superficies y acento.</p>
           </div>
           <button onClick={() => setTheme('custom')} className="btn-ghost text-xs">
             Usar custom
@@ -62,8 +62,8 @@ export default function Appearance() {
             ['accent', 'Acento'],
             ['text', 'Texto'],
           ].map(([key, label]) => (
-            <label key={key} className="flex items-center justify-between gap-3 bg-white/[0.035] border border-white/[0.06] rounded-xl px-3 py-2">
-              <span className="text-xs text-white/55">{label}</span>
+            <label key={key} className="flex items-center justify-between gap-3 bg-overlay/[0.035] border border-line/[0.06] rounded-xl px-3 py-2">
+              <span className="text-xs text-fg/55">{label}</span>
               <input
                 type="color"
                 value={customTheme[key]}
@@ -72,12 +72,12 @@ export default function Appearance() {
               />
             </label>
           ))}
-          <label className="flex items-center justify-between gap-3 bg-white/[0.035] border border-white/[0.06] rounded-xl px-3 py-2">
-            <span className="text-xs text-white/55">Modo</span>
+          <label className="flex items-center justify-between gap-3 bg-overlay/[0.035] border border-line/[0.06] rounded-xl px-3 py-2">
+            <span className="text-xs text-fg/55">Modo</span>
             <select
               value={customTheme.mode}
               onChange={e => setCustomTheme({ mode: e.target.value })}
-              className="bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1 text-xs text-white outline-none"
+              className="bg-overlay/[0.06] border border-line/[0.08] rounded-lg px-2 py-1 text-xs text-fg outline-none"
             >
               <option value="dark">Dark</option>
               <option value="light">Light</option>
@@ -88,13 +88,13 @@ export default function Appearance() {
 
       <div className="glass rounded-2xl p-4 flex flex-col gap-5">
         <div>
-          <h3 className="text-sm font-semibold text-white/80">Editor avanzado</h3>
-          <p className="text-xs text-white/35">Ajusta forma, densidad, transparencia y tipografía de la interfaz.</p>
+          <h3 className="text-sm font-semibold text-fg/80">Editor avanzado</h3>
+          <p className="text-xs text-fg/35">Ajusta forma, densidad, transparencia y tipografía de la interfaz.</p>
         </div>
 
         {/* Radio de bordes */}
         <div className="flex flex-col gap-2">
-          <h4 className="text-[11px] font-semibold text-white/35 uppercase tracking-wider">Radio de bordes</h4>
+          <h4 className="text-[11px] font-semibold text-fg/35 uppercase tracking-wider">Radio de bordes</h4>
           <div className="grid grid-cols-3 gap-2.5">
             {Object.entries(RADIUS_OPTIONS).map(([id, opt]) => {
               const Icon = RADIUS_ICONS[id] || Square;
@@ -104,7 +104,7 @@ export default function Appearance() {
                   key={id}
                   onClick={() => setUiPrefs({ radius: id })}
                   className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border transition-all ${
-                    selected ? 'bg-violet-600/15 border-violet-500/40 text-violet-300' : 'bg-white/[0.035] border-white/[0.06] text-white/45 hover:text-white/70 hover:border-white/[0.12]'
+                    selected ? 'bg-violet-600/15 border-violet-500/40 text-violet-300' : 'bg-overlay/[0.035] border-line/[0.06] text-fg/45 hover:text-fg/70 hover:border-line/[0.12]'
                   }`}
                 >
                   <Icon size={18} />
@@ -117,7 +117,7 @@ export default function Appearance() {
 
         {/* Densidad */}
         <div className="flex flex-col gap-2">
-          <h4 className="text-[11px] font-semibold text-white/35 uppercase tracking-wider">Densidad</h4>
+          <h4 className="text-[11px] font-semibold text-fg/35 uppercase tracking-wider">Densidad</h4>
           <div className="grid grid-cols-3 gap-2.5">
             {Object.entries(DENSITY_OPTIONS).map(([id, opt]) => {
               const selected = uiPrefs.density === id;
@@ -127,11 +127,11 @@ export default function Appearance() {
                   onClick={() => setUiPrefs({ density: id })}
                   title={opt.desc}
                   className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border transition-all text-center ${
-                    selected ? 'bg-violet-600/15 border-violet-500/40 text-violet-300' : 'bg-white/[0.035] border-white/[0.06] text-white/45 hover:text-white/70 hover:border-white/[0.12]'
+                    selected ? 'bg-violet-600/15 border-violet-500/40 text-violet-300' : 'bg-overlay/[0.035] border-line/[0.06] text-fg/45 hover:text-fg/70 hover:border-line/[0.12]'
                   }`}
                 >
                   <span className="text-[11px] font-medium">{opt.label}</span>
-                  <span className="text-[10px] text-white/30 leading-snug">{opt.desc}</span>
+                  <span className="text-[10px] text-fg/30 leading-snug">{opt.desc}</span>
                 </button>
               );
             })}
@@ -141,8 +141,8 @@ export default function Appearance() {
         {/* Intensidad del glassmorphism */}
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <h4 className="text-[11px] font-semibold text-white/35 uppercase tracking-wider">Transparencia (glassmorphism)</h4>
-            <span className="text-[11px] text-white/40 tabular-nums">{uiPrefs.glassOpacity}%</span>
+            <h4 className="text-[11px] font-semibold text-fg/35 uppercase tracking-wider">Transparencia (glassmorphism)</h4>
+            <span className="text-[11px] text-fg/40 tabular-nums">{uiPrefs.glassOpacity}%</span>
           </div>
           <input
             type="range"
@@ -153,12 +153,12 @@ export default function Appearance() {
             onChange={e => setUiPrefs({ glassOpacity: Number(e.target.value) })}
             className="w-full accent-violet-500"
           />
-          <p className="text-[11px] text-white/28">Más alto = paneles más opacos y fáciles de leer; más bajo = más translúcidos.</p>
+          <p className="text-[11px] text-fg/28">Más alto = paneles más opacos y fáciles de leer; más bajo = más translúcidos.</p>
         </div>
 
         {/* Fuente */}
         <div className="flex flex-col gap-2">
-          <h4 className="text-[11px] font-semibold text-white/35 uppercase tracking-wider">Tipografía</h4>
+          <h4 className="text-[11px] font-semibold text-fg/35 uppercase tracking-wider">Tipografía</h4>
           <div className="grid grid-cols-2 gap-2.5">
             {Object.entries(FONT_OPTIONS).map(([id, opt]) => {
               const selected = uiPrefs.font === id;
@@ -168,7 +168,7 @@ export default function Appearance() {
                   onClick={() => setUiPrefs({ font: id })}
                   style={{ fontFamily: opt.stack }}
                   className={`flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border transition-all ${
-                    selected ? 'bg-violet-600/15 border-violet-500/40 text-violet-300' : 'bg-white/[0.035] border-white/[0.06] text-white/55 hover:text-white/80 hover:border-white/[0.12]'
+                    selected ? 'bg-violet-600/15 border-violet-500/40 text-violet-300' : 'bg-overlay/[0.035] border-line/[0.06] text-fg/55 hover:text-fg/80 hover:border-line/[0.12]'
                   }`}
                 >
                   <span className="text-sm">{opt.label}</span>
@@ -188,10 +188,10 @@ function ThemeCard({ label, desc, icon: Icon, selected, onClick, palette }) {
     <button
       onClick={onClick}
       className={`flex flex-col gap-3 p-4 rounded-2xl border transition-all duration-150 text-left ${
-        selected ? 'bg-violet-600/15 border-violet-500/40 shadow-glow-sm' : 'glass hover:border-white/[0.12] hover:bg-white/[0.05]'
+        selected ? 'bg-violet-600/15 border-violet-500/40 shadow-glow-sm' : 'glass hover:border-line/[0.12] hover:bg-overlay/[0.05]'
       }`}
     >
-      <div className="w-full h-16 rounded-lg border border-white/10 p-2 flex gap-2" style={{ background: palette.bg }}>
+      <div className="w-full h-16 rounded-lg border border-line/10 p-2 flex gap-2" style={{ background: palette.bg }}>
         <div className="w-8 rounded-md" style={{ background: palette.accent }} />
         <div className="flex-1 rounded-md p-2" style={{ background: palette.card }}>
           <div className="w-3/4 h-1.5 rounded-full mb-2" style={{ background: palette.elevated }} />
@@ -199,10 +199,10 @@ function ThemeCard({ label, desc, icon: Icon, selected, onClick, palette }) {
         </div>
       </div>
       <div className="flex items-start gap-2">
-        <Icon size={14} className={selected ? 'text-violet-400 mt-0.5' : 'text-white/30 mt-0.5'} />
+        <Icon size={14} className={selected ? 'text-violet-400 mt-0.5' : 'text-fg/30 mt-0.5'} />
         <div className="min-w-0">
-          <p className={`text-sm font-medium ${selected ? 'text-violet-300' : 'text-white/70'}`}>{label}</p>
-          <p className="text-[11px] text-white/32 mt-0.5">{desc}</p>
+          <p className={`text-sm font-medium ${selected ? 'text-violet-300' : 'text-fg/70'}`}>{label}</p>
+          <p className="text-[11px] text-fg/32 mt-0.5">{desc}</p>
         </div>
       </div>
     </button>

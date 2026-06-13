@@ -42,6 +42,7 @@ module.exports = {
         'toast-out':   'toastOut 0.25s ease-in forwards',
         'glow-pulse':  'glowPulse 2s ease-in-out infinite',
         'shimmer':     'shimmer 1.8s linear infinite',
+        'press-flash': 'pressFlash 0.5s ease-out',
       },
       keyframes: {
         fadeIn:   { from: { opacity: '0' }, to: { opacity: '1' } },
@@ -58,6 +59,11 @@ module.exports = {
         shimmer: {
           from: { backgroundPosition: '-200% 0' },
           to:   { backgroundPosition: '200% 0' },
+        },
+        pressFlash: {
+          '0%':   { boxShadow: '0 0 0 0 rgba(124,58,237,0.45)' },
+          '70%':  { boxShadow: '0 0 0 10px rgba(124,58,237,0)' },
+          '100%': { boxShadow: '0 0 0 0 rgba(124,58,237,0)' },
         },
       },
       boxShadow: {

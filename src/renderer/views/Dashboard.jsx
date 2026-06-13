@@ -1,5 +1,8 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { Search, Plus, Compass, Loader2, Clock, FolderOpen, Trash2, UserRound, BriefcaseBusiness, Layers3, TrendingUp } from 'lucide-react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import {
+  Search, Plus, Compass, Loader2, Clock, FolderOpen, Trash2, UserRound, BriefcaseBusiness, Layers3, TrendingUp,
+  Star, AlertTriangle, LayoutGrid, Grid2x2, Rows3, CheckSquare, Square, X, Wrench, Image as ImageIcon, Eraser, Download,
+} from 'lucide-react';
 import AppCard   from '../components/common/AppCard';
 import AppIcon   from '../components/common/AppIcon';
 import Modal     from '../components/common/Modal';
@@ -7,20 +10,44 @@ import CreateApp  from './CreateApp';
 import { useApps }        from '../contexts/AppContext';
 import { useI18n }        from '../contexts/I18nContext';
 import { useWorkspaces }  from '../contexts/WorkspaceContext';
+import { useToast }       from '../contexts/ToastContext';
 import { filterApps }     from '../lib/utils';
 
+const DENSITY_OPTIONS = [
+  { id: 'comfortable', label: 'Cómodo',   icon: LayoutGrid },
+  { id: 'compact',     label: 'Compacto', icon: Grid2x2 },
+  { id: 'list',        label: 'Lista',    icon: Rows3 },
+];
+
+const QUICK_FILTERS = [
+  { id: 'favorites', label: 'Favoritos',       icon: Star },
+  { id: 'mostUsed',  label: 'Más usadas',      icon: TrendingUp },
+  { id: 'unused',    label: 'Sin abrir 7d+',   icon: Clock },
+  { id: 'problems',  label: 'Con problemas',   icon: AlertTriangle },
+];
+
 export default function Dashboard({ selectedCategory, selectedWorkspace, onSelectWorkspace, onNavigate, onOpenTools }) {
-  const { apps, recentApps, loading, openWindows } = useApps();
+  const { apps, recentApps, loading, openWindows, problemAppIds } = useApps();
   const { workspaces }                             = useWorkspaces();
   const { t }                          = useI18n();
+  const toast = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [profileFilter, setProfileFilter] = useState('all');
   const [editingApp,  setEditingApp]  = useState(null);
   const [showWSModal, setShowWSModal] = useState(false);
+  const [density, setDensity] = useState(() => localStorage.getItem('as_density') || 'comfortable');
+  const [quickFilter, setQuickFilter] = useState(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  useEffect(() => { localStorage.setItem('as_density', density); }, [density]);
 
   const handleEdit = useCallback((app) => setEditingApp(app), []);
 
-  // Filtrar por categoría, workspace y búsqueda
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+  // Filtrar por categoría, workspace, perfil, filtro rápido y búsqueda
   const filteredApps = useMemo(() => {
     let result = apps;
     if (selectedCategory && selectedCategory !== 'all') {
@@ -32,17 +59,25 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
     if (profileFilter !== 'all') {
       result = result.filter(a => (a.security?.profile || 'personal') === profileFilter);
     }
+    if (quickFilter === 'favorites') {
+      result = result.filter(a => a.favorite);
+    } else if (quickFilter === 'mostUsed') {
+      result = [...result].filter(a => (a.openCount || 0) > 0).sort((a, b) => (b.openCount || 0) - (a.openCount || 0)).slice(0, 16);
+    } else if (quickFilter === 'unused') {
+      result = result.filter(a => (!a.lastUsed || a.lastUsed < sevenDaysAgo) && !openWindows?.has(a.id));
+    } else if (quickFilter === 'problems') {
+      result = result.filter(a => problemAppIds?.has(a.id));
+    }
     return filterApps(result, searchQuery);
-  }, [apps, selectedCategory, selectedWorkspace, profileFilter, searchQuery]);
+  }, [apps, selectedCategory, selectedWorkspace, profileFilter, quickFilter, searchQuery, openWindows, problemAppIds, sevenDaysAgo]);
 
-  const showRecent = !searchQuery && selectedCategory === 'all' && recentApps.length > 0;
+  const showRecent = !searchQuery && selectedCategory === 'all' && !quickFilter && recentApps.length > 0;
   const isEmpty    = apps.length === 0 && !loading;
 
   const mostUsed = useMemo(() =>
     apps.length ? [...apps].sort((a, b) => (b.openCount || 0) - (a.openCount || 0))[0] : null,
     [apps]);
 
-  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const inactiveApps = useMemo(() =>
     apps.filter(a => a.lastUsed && a.lastUsed < sevenDaysAgo && !openWindows?.has(a.id)).slice(0, 3),
     [apps, openWindows]);
@@ -53,6 +88,67 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
     personal: apps.filter(a => (a.security?.profile || 'personal') === 'personal').length,
     work: apps.filter(a => (a.security?.profile || 'personal') === 'work').length,
   }), [apps]);
+
+  const quickFilterCounts = useMemo(() => ({
+    favorites: apps.filter(a => a.favorite).length,
+    mostUsed:  apps.filter(a => (a.openCount || 0) > 0).length,
+    unused:    apps.filter(a => (!a.lastUsed || a.lastUsed < sevenDaysAgo) && !openWindows?.has(a.id)).length,
+    problems:  apps.filter(a => problemAppIds?.has(a.id)).length,
+  }), [apps, openWindows, problemAppIds, sevenDaysAgo]);
+
+  // ── Selección múltiple / acciones masivas ────────────────────────────────
+  const toggleSelect = useCallback((appId) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(appId)) next.delete(appId); else next.add(appId);
+      return next;
+    });
+  }, []);
+
+  const selectAll  = () => setSelectedIds(new Set(filteredApps.map(a => a.id)));
+  const selectNone = () => setSelectedIds(new Set());
+
+  const exitSelectionMode = () => { setSelectionMode(false); setSelectedIds(new Set()); };
+
+  const withBulkBusy = async (fn) => {
+    setBulkBusy(true);
+    try { await fn(); } finally { setBulkBusy(false); }
+  };
+
+  const handleBulkRepairShortcuts = () => withBulkBusy(async () => {
+    for (const id of selectedIds) await window.electronAPI?.createShortcuts(id);
+    toast.success('Accesos directos reparados', `${selectedIds.size} apps`);
+  });
+
+  const handleBulkRefreshIcons = () => withBulkBusy(async () => {
+    await window.electronAPI?.refreshAppIcons?.([...selectedIds]);
+    for (const id of selectedIds) await window.electronAPI?.createShortcuts(id);
+    toast.success('Iconos actualizados', `${selectedIds.size} apps`);
+  });
+
+  const handleBulkClearCache = () => withBulkBusy(async () => {
+    for (const id of selectedIds) await window.electronAPI?.clearAppData(id);
+    toast.success('Cache limpiada', `${selectedIds.size} apps`);
+  });
+
+  const handleBulkExport = () => {
+    const selectedApps = apps.filter(a => selectedIds.has(a.id));
+    const payload = JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), apps: selectedApps }, null, 2);
+    const blob = new Blob([payload], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `appspawner-grupo-${Date.now()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('Grupo exportado', `${selectedApps.length} apps`);
+  };
+
+  const gridClass = density === 'list'
+    ? 'flex flex-col gap-1.5 animate-fade-in'
+    : density === 'compact'
+      ? 'grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-2 animate-fade-in'
+      : 'grid grid-cols-[repeat(auto-fill,minmax(240px,280px))] justify-start gap-3 animate-fade-in';
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -110,26 +206,83 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
         )}
 
         {apps.length > 0 && (
-          <div className="flex gap-2 mt-3">
-            {[
-              { id: 'all', label: 'Todas', icon: Layers3, count: profileCounts.all },
-              { id: 'personal', label: 'Personal', icon: UserRound, count: profileCounts.personal },
-              { id: 'work', label: 'Trabajo', icon: BriefcaseBusiness, count: profileCounts.work },
-            ].map(({ id, label, icon: Icon, count }) => (
+          <div className="flex items-center justify-between gap-3 mt-3">
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { id: 'all', label: 'Todas', icon: Layers3, count: profileCounts.all },
+                { id: 'personal', label: 'Personal', icon: UserRound, count: profileCounts.personal },
+                { id: 'work', label: 'Trabajo', icon: BriefcaseBusiness, count: profileCounts.work },
+              ].map(({ id, label, icon: Icon, count }) => (
+                <button
+                  key={id}
+                  onClick={() => setProfileFilter(id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs border transition-all ${
+                    profileFilter === id
+                      ? 'bg-violet-600/20 border-violet-500/35 text-violet-300'
+                      : 'bg-overlay/[0.035] border-line/[0.06] text-fg/35 hover:text-fg/60'
+                  }`}
+                >
+                  <Icon size={12} /> {label}
+                  <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] ${
+                    profileFilter === id ? 'bg-violet-400/15 text-violet-100/70' : 'bg-overlay/[0.04] text-fg/28'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Selección múltiple */}
               <button
-                key={id}
-                onClick={() => setProfileFilter(id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs border transition-all ${
-                  profileFilter === id
+                onClick={() => selectionMode ? exitSelectionMode() : setSelectionMode(true)}
+                title="Selección múltiple"
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs border transition-all ${
+                  selectionMode
                     ? 'bg-violet-600/20 border-violet-500/35 text-violet-300'
                     : 'bg-overlay/[0.035] border-line/[0.06] text-fg/35 hover:text-fg/60'
                 }`}
               >
-                <Icon size={12} /> {label}
-                <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] ${
-                  profileFilter === id ? 'bg-violet-400/15 text-violet-100/70' : 'bg-white/[0.04] text-fg/28'
+                {selectionMode ? <X size={12} /> : <CheckSquare size={12} />}
+              </button>
+
+              {/* Densidad */}
+              <div className="flex items-center gap-0.5 p-0.5 rounded-full bg-overlay/[0.035] border border-line/[0.06]">
+                {DENSITY_OPTIONS.map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    onClick={() => setDensity(id)}
+                    title={label}
+                    className={`flex items-center justify-center w-7 h-7 rounded-full transition-all ${
+                      density === id ? 'bg-violet-600/25 text-violet-300' : 'text-fg/30 hover:text-fg/60'
+                    }`}
+                  >
+                    <Icon size={13} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Filtros rápidos ─────────────────────────────────────────────── */}
+        {apps.length > 0 && (
+          <div className="flex gap-2 mt-2 flex-wrap">
+            {QUICK_FILTERS.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setQuickFilter(prev => prev === id ? null : id)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] border transition-all ${
+                  quickFilter === id
+                    ? 'bg-violet-600/20 border-violet-500/35 text-violet-300'
+                    : 'bg-overlay/[0.025] border-line/[0.05] text-fg/30 hover:text-fg/55'
+                }`}
+              >
+                <Icon size={11} /> {label}
+                <span className={`rounded-full px-1.5 py-0.5 text-[9px] ${
+                  quickFilter === id ? 'bg-violet-400/15 text-violet-100/70' : 'bg-overlay/[0.04] text-fg/25'
                 }`}>
-                  {count}
+                  {quickFilterCounts[id]}
                 </span>
               </button>
             ))}
@@ -155,6 +308,48 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
                 <span className="text-fg/32">({mostUsed.openCount}×)</span>
               </span>
             )}
+          </div>
+        )}
+
+        {/* ── Barra de acciones masivas ────────────────────────────────── */}
+        {selectionMode && !loading && !isEmpty && (
+          <div className="flex items-center justify-between gap-3 mb-4 px-3 py-2 rounded-xl bg-violet-600/[0.08] border border-violet-500/20 flex-wrap">
+            <div className="flex items-center gap-2 text-xs text-fg/55">
+              <span className="font-semibold text-violet-300">{selectedIds.size}</span> seleccionadas
+              <button onClick={selectAll} className="text-fg/35 hover:text-fg/70 underline-offset-2 hover:underline">Todas</button>
+              <button onClick={selectNone} className="text-fg/35 hover:text-fg/70 underline-offset-2 hover:underline">Ninguna</button>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                onClick={handleBulkRepairShortcuts}
+                disabled={selectedIds.size === 0 || bulkBusy}
+                className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg bg-overlay/[0.05] text-fg/55 hover:text-fg/85 hover:bg-overlay/[0.09] transition-all disabled:opacity-40"
+              >
+                <Wrench size={12} /> Reparar accesos
+              </button>
+              <button
+                onClick={handleBulkRefreshIcons}
+                disabled={selectedIds.size === 0 || bulkBusy}
+                className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg bg-overlay/[0.05] text-fg/55 hover:text-fg/85 hover:bg-overlay/[0.09] transition-all disabled:opacity-40"
+              >
+                <ImageIcon size={12} /> Actualizar iconos
+              </button>
+              <button
+                onClick={handleBulkClearCache}
+                disabled={selectedIds.size === 0 || bulkBusy}
+                className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg bg-overlay/[0.05] text-fg/55 hover:text-fg/85 hover:bg-overlay/[0.09] transition-all disabled:opacity-40"
+              >
+                <Eraser size={12} /> Limpiar cache
+              </button>
+              <button
+                onClick={handleBulkExport}
+                disabled={selectedIds.size === 0 || bulkBusy}
+                className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg bg-overlay/[0.05] text-fg/55 hover:text-fg/85 hover:bg-overlay/[0.09] transition-all disabled:opacity-40"
+              >
+                <Download size={12} /> Exportar grupo
+              </button>
+              {bulkBusy && <Loader2 size={13} className="text-violet-400 animate-spin" />}
+            </div>
           </div>
         )}
 
@@ -219,14 +414,23 @@ export default function Dashboard({ selectedCategory, selectedWorkspace, onSelec
             )}
 
             {/* ── Grid principal ─────────────────────────────────────────── */}
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,280px))] justify-start gap-3 animate-fade-in">
+            <div className={gridClass}>
               {filteredApps.map((app, i) => (
                 <div
                   key={app.id}
                   className="animate-slide-up"
                   style={{ animationDelay: `${Math.min(i * 25, 300)}ms`, animationFillMode: 'both' }}
                 >
-                  <AppCard app={app} onEdit={handleEdit} onOpenTools={onOpenTools} />
+                  <AppCard
+                    app={app}
+                    onEdit={handleEdit}
+                    onOpenTools={onOpenTools}
+                    density={density}
+                    selectionMode={selectionMode}
+                    selected={selectedIds.has(app.id)}
+                    onToggleSelect={toggleSelect}
+                    hasProblem={problemAppIds?.has(app.id)}
+                  />
                 </div>
               ))}
 

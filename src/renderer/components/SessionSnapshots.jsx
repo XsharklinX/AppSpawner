@@ -76,8 +76,8 @@ export default function SessionSnapshots({ app, onClose }) {
       {/* Info */}
       <div className="flex items-start gap-3 glass rounded-xl p-3.5">
         <Cookie size={16} className="text-violet-400 mt-0.5 flex-shrink-0" />
-        <p className="text-xs text-white/40 leading-relaxed">
-          Guarda el estado actual de cookies de <strong className="text-white/60">{app.name}</strong>.
+        <p className="text-xs text-fg/40 leading-relaxed">
+          Guarda el estado actual de cookies de <strong className="text-fg/60">{app.name}</strong>.
           Úsalo para guardar sesiones de login y restaurarlas cuando quieras.
         </p>
       </div>
@@ -92,8 +92,8 @@ export default function SessionSnapshots({ app, onClose }) {
           {snapshots.map(s => (
             <div key={s.id} className="glass rounded-xl px-3.5 py-3 flex items-center gap-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white/80 truncate">{s.name}</p>
-                <p className="text-[11px] text-white/30">
+                <p className="text-sm font-medium text-fg/80 truncate">{s.name}</p>
+                <p className="text-[11px] text-fg/30">
                   {formatRelativeTime(s.savedAt, language)} · {s.cookieCount} cookies
                 </p>
               </div>
@@ -112,7 +112,7 @@ export default function SessionSnapshots({ app, onClose }) {
                 </button>
                 <button
                   onClick={() => handleDelete(s)}
-                  className="p-1.5 rounded-lg text-white/25 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                  className="p-1.5 rounded-lg text-fg/25 hover:text-red-400 hover:bg-red-500/10 transition-all"
                   title="Eliminar snapshot"
                 >
                   <Trash2 size={12} />
@@ -124,8 +124,8 @@ export default function SessionSnapshots({ app, onClose }) {
       )}
 
       {/* Guardar nuevo snapshot */}
-      <div className="border-t border-white/[0.06] pt-3 flex flex-col gap-2">
-        <p className="text-[11px] font-semibold text-white/30 uppercase tracking-wider">Nuevo snapshot</p>
+      <div className="border-t border-line/[0.06] pt-3 flex flex-col gap-2">
+        <p className="text-[11px] font-semibold text-fg/30 uppercase tracking-wider">Nuevo snapshot</p>
         <div className="flex gap-2">
           <input
             type="text"
@@ -141,7 +141,7 @@ export default function SessionSnapshots({ app, onClose }) {
             className="btn-primary flex items-center gap-2 text-sm px-4 flex-shrink-0"
           >
             {saving
-              ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              ? <div className="w-4 h-4 border-2 border-line/40 border-t-white rounded-full animate-spin" />
               : <Camera size={14} />
             }
             Guardar

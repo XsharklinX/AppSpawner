@@ -132,10 +132,43 @@ const DEFAULT_APP_SETTINGS = {
     },
   },
   pinned: false,
+  favorite: false,
   lastUsed: null,
   openCount: 0,
   installedAt: null,
+  // Uso diario { 'YYYY-MM-DD': { opens: number, timeMs: number } }, para el ranking semanal de Insights
+  dailyUsage: {},
 };
+
+const USAGE_HISTORY_DAYS = 35;
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * Suma aperturas y/o tiempo de uso del día actual en appConfig.dailyUsage,
+ * podando entradas más antiguas que USAGE_HISTORY_DAYS días.
+ * Muta y devuelve appConfig.
+ */
+function recordDailyUsage(appConfig, { opens = 0, timeMs = 0 } = {}) {
+  const key = todayKey();
+  const usage = (appConfig.dailyUsage && typeof appConfig.dailyUsage === 'object' && !Array.isArray(appConfig.dailyUsage))
+    ? { ...appConfig.dailyUsage }
+    : {};
+  const entry = { opens: 0, timeMs: 0, ...(usage[key] || {}) };
+  entry.opens += opens;
+  entry.timeMs += timeMs;
+  usage[key] = entry;
+
+  const cutoff = Date.now() - USAGE_HISTORY_DAYS * 24 * 60 * 60 * 1000;
+  for (const dateKey of Object.keys(usage)) {
+    if (new Date(dateKey).getTime() < cutoff) delete usage[dateKey];
+  }
+
+  appConfig.dailyUsage = usage;
+  return appConfig;
+}
 
 function mergeObject(defaults, value) {
   return { ...defaults, ...((value && typeof value === 'object') ? value : {}) };
@@ -175,6 +208,9 @@ function normalizeApp(appConfig = {}) {
     },
     openCount: Number(appData.openCount) || 0,
     installedAt: appData.installedAt || Date.now(),
+    dailyUsage: (appData.dailyUsage && typeof appData.dailyUsage === 'object' && !Array.isArray(appData.dailyUsage))
+      ? appData.dailyUsage
+      : {},
   };
 }
 
@@ -334,5 +370,6 @@ module.exports = {
   normalizeApp,
   getMigrationStatus,
   migrate,
+  recordDailyUsage,
   DATA_SCHEMA_VERSION,
 };

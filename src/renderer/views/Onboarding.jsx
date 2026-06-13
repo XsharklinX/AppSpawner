@@ -158,7 +158,7 @@ export default function Onboarding({ onComplete }) {
   };
 
   return (
-    <div className="w-screen h-screen bg-surface-base text-white overflow-hidden relative">
+    <div className="w-screen h-screen bg-surface-base text-fg overflow-hidden relative">
       <div className="absolute inset-0 pointer-events-none opacity-[0.05]"
         style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.45) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.45) 1px, transparent 1px)', backgroundSize: '44px 44px' }}
       />
@@ -172,24 +172,24 @@ export default function Onboarding({ onComplete }) {
             </div>
             <div>
               <p className="text-sm font-bold tracking-wide">APPSPAWNER</p>
-              <p className="text-xs text-white/35">Site-Specific Browser Manager</p>
+              <p className="text-xs text-fg/35">Site-Specific Browser Manager</p>
             </div>
           </div>
-          <button onClick={() => saveUser(language === 'en' ? 'User' : 'Usuario')} className="text-xs text-white/35 hover:text-white/70 transition-colors">
+          <button onClick={() => saveUser(language === 'en' ? 'User' : 'Usuario')} className="text-xs text-fg/35 hover:text-fg/70 transition-colors">
             {copy.skip}
           </button>
         </header>
 
         <main className="flex-1 grid lg:grid-cols-[0.9fr_1.1fr] gap-10 items-center min-h-0 py-8">
           <section className="max-w-xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs text-white/50 mb-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-overlay/[0.06] border border-line/[0.08] text-xs text-fg/50 mb-6">
               <Icon size={14} className="text-violet-300" />
               Paso {step + 1} de {slides.length}
             </div>
             <h1 className="text-4xl lg:text-5xl font-black leading-[1.02] tracking-normal mb-5">
               {current.title}
             </h1>
-            <p className="text-base text-white/48 leading-relaxed max-w-lg">
+            <p className="text-base text-fg/48 leading-relaxed max-w-lg">
               {current.text}
             </p>
 
@@ -204,12 +204,12 @@ export default function Onboarding({ onComplete }) {
                         onClick={() => setFocus(id)}
                         className={`text-left rounded-xl border px-3 py-2.5 transition-all ${
                           focus === id
-                            ? 'bg-violet-600/18 border-violet-400/45 text-white'
-                            : 'bg-white/[0.035] border-white/[0.07] text-white/55 hover:text-white/80'
+                            ? 'bg-violet-600/18 border-violet-400/45 text-fg'
+                            : 'bg-overlay/[0.035] border-line/[0.07] text-fg/55 hover:text-fg/80'
                         }`}
                       >
                         <span className="block text-sm font-semibold">{title}</span>
-                        <span className="block text-xs text-white/35 mt-0.5">{description}</span>
+                        <span className="block text-xs text-fg/35 mt-0.5">{description}</span>
                       </button>
                     ))}
                   </div>
@@ -242,7 +242,7 @@ export default function Onboarding({ onComplete }) {
               <button
                 key={i}
                 onClick={() => setStep(i)}
-                className={`h-1.5 rounded-full transition-all ${i === step ? 'w-10 bg-violet-400' : 'w-2.5 bg-white/18 hover:bg-white/35'}`}
+                className={`h-1.5 rounded-full transition-all ${i === step ? 'w-10 bg-violet-400' : 'w-2.5 bg-overlay/18 hover:bg-overlay/35'}`}
                 aria-label={`Ir al paso ${i + 1}`}
               />
             ))}
@@ -272,22 +272,22 @@ export default function Onboarding({ onComplete }) {
 
 function PreviewDashboard({ cards }) {
   return (
-    <div className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] p-5 shadow-card-hover">
+    <div className="w-full rounded-2xl border border-line/[0.08] bg-overlay/[0.035] p-5 shadow-card-hover">
       <div className="flex items-center justify-between mb-5">
         <div>
           <p className="text-sm font-semibold">Mis Apps</p>
-          <p className="text-xs text-white/35">Entornos aislados listos para abrir</p>
+          <p className="text-xs text-fg/35">Entornos aislados listos para abrir</p>
         </div>
-        <div className="w-28 h-9 rounded-xl bg-white/[0.06]" />
+        <div className="w-28 h-9 rounded-xl bg-overlay/[0.06]" />
       </div>
       <div className="grid sm:grid-cols-3 gap-3">
         {cards.map(([title, text], index) => (
-          <div key={title} className="rounded-xl bg-surface-card border border-white/[0.08] p-4 min-h-[150px]">
+          <div key={title} className="rounded-xl bg-surface-card border border-line/[0.08] p-4 min-h-[150px]">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${index === 0 ? 'bg-violet-600/25 text-violet-300' : index === 1 ? 'bg-emerald-600/20 text-emerald-300' : 'bg-sky-600/20 text-sky-300'}`}>
               {index === 0 ? <Globe2 size={18} /> : index === 1 ? <MonitorUp size={18} /> : <ShieldCheck size={18} />}
             </div>
             <p className="text-sm font-semibold">{title}</p>
-            <p className="text-xs text-white/35 leading-relaxed mt-2">{text}</p>
+            <p className="text-xs text-fg/35 leading-relaxed mt-2">{text}</p>
           </div>
         ))}
       </div>
@@ -297,18 +297,18 @@ function PreviewDashboard({ cards }) {
 
 function FlowPreview({ steps }) {
   return (
-    <div className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] p-5">
+    <div className="w-full rounded-2xl border border-line/[0.08] bg-overlay/[0.035] p-5">
       <div className="space-y-3">
         {steps.map(([title, text], index) => (
-          <div key={title} className="flex items-center gap-4 rounded-xl bg-surface-card border border-white/[0.08] p-4">
+          <div key={title} className="flex items-center gap-4 rounded-xl bg-surface-card border border-line/[0.08] p-4">
             <div className="w-10 h-10 rounded-xl bg-violet-600/20 text-violet-300 flex items-center justify-center font-bold">
               {index + 1}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold">{title}</p>
-              <p className="text-xs text-white/35">{text}</p>
+              <p className="text-xs text-fg/35">{text}</p>
             </div>
-            {index < steps.length - 1 && <ArrowRight size={16} className="text-white/22" />}
+            {index < steps.length - 1 && <ArrowRight size={16} className="text-fg/22" />}
           </div>
         ))}
       </div>
@@ -319,19 +319,19 @@ function FlowPreview({ steps }) {
 function ControlPreview() {
   const tools = ['Ad Block', 'PiP', 'Toolbar', 'Scripts', '2FA', 'Sesiones'];
   return (
-    <div className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] p-5">
-      <div className="rounded-xl bg-surface-card border border-white/[0.08] p-5">
+    <div className="w-full rounded-2xl border border-line/[0.08] bg-overlay/[0.035] p-5">
+      <div className="rounded-xl bg-surface-card border border-line/[0.08] p-5">
         <div className="aspect-video rounded-xl bg-black overflow-hidden relative mb-4">
-          <div className="absolute inset-x-5 bottom-5 h-10 rounded-xl bg-white/[0.08] border border-white/[0.08] flex items-center px-3 gap-3">
+          <div className="absolute inset-x-5 bottom-5 h-10 rounded-xl bg-overlay/[0.08] border border-line/[0.08] flex items-center px-3 gap-3">
             <MousePointerClick size={16} className="text-violet-300" />
-            <div className="h-1.5 flex-1 rounded-full bg-white/[0.12] overflow-hidden">
+            <div className="h-1.5 flex-1 rounded-full bg-overlay/[0.12] overflow-hidden">
               <div className="h-full w-2/3 bg-violet-400 rounded-full" />
             </div>
           </div>
         </div>
         <div className="grid grid-cols-3 gap-2">
           {tools.map(tool => (
-            <div key={tool} className="rounded-lg bg-white/[0.045] border border-white/[0.06] px-3 py-2 text-xs text-white/55">
+            <div key={tool} className="rounded-lg bg-overlay/[0.045] border border-line/[0.06] px-3 py-2 text-xs text-fg/55">
               {tool}
             </div>
           ))}
@@ -343,8 +343,8 @@ function ControlPreview() {
 
 function ExpectationPreview({ items }) {
   return (
-    <div className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] p-5">
-      <div className="rounded-xl bg-surface-card border border-white/[0.08] p-5">
+    <div className="w-full rounded-2xl border border-line/[0.08] bg-overlay/[0.035] p-5">
+      <div className="rounded-xl bg-surface-card border border-line/[0.08] p-5">
         <p className="text-sm font-semibold mb-4">Roadmap de experiencia</p>
         <div className="space-y-3">
           {items.map(item => (
@@ -352,7 +352,7 @@ function ExpectationPreview({ items }) {
               <div className="mt-0.5 w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-300 flex items-center justify-center flex-shrink-0">
                 <Check size={12} />
               </div>
-              <p className="text-sm text-white/55 leading-relaxed">{item}</p>
+              <p className="text-sm text-fg/55 leading-relaxed">{item}</p>
             </div>
           ))}
         </div>

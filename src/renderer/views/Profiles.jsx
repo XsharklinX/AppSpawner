@@ -50,8 +50,8 @@ export default function Profiles({ onOpenTools }) {
                   <Rocket size={19} className="text-violet-300" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-white">Perfiles de lanzamiento</h1>
-                  <p className="text-sm text-white/38 mt-0.5">
+                  <h1 className="text-xl font-bold text-fg">Perfiles de lanzamiento</h1>
+                  <p className="text-sm text-fg/38 mt-0.5">
                     Crea flujos de trabajo que abren varias apps en secuencia.
                   </p>
                 </div>
@@ -126,12 +126,12 @@ export default function Profiles({ onOpenTools }) {
 function Stat({ label, value, icon: Icon }) {
   return (
     <div className="glass rounded-xl px-4 py-3 flex items-center gap-3">
-      <div className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center text-white/45">
+      <div className="w-8 h-8 rounded-lg bg-overlay/[0.05] flex items-center justify-center text-fg/45">
         <Icon size={15} />
       </div>
       <div>
-        <p className="text-lg font-semibold text-white leading-none">{value}</p>
-        <p className="text-[11px] text-white/32 mt-1">{label}</p>
+        <p className="text-lg font-semibold text-fg leading-none">{value}</p>
+        <p className="text-[11px] text-fg/32 mt-1">{label}</p>
       </div>
     </div>
   );
@@ -164,7 +164,7 @@ function ProfileCard({ profile, apps, allApps, launching, onLaunch, onEdit, onDe
   const firstSecureApp = apps.find(app => app.security?.locked || app.security?.sensitive) || apps[0];
 
   return (
-    <div className="glass rounded-2xl p-5 flex flex-col gap-4 border-white/[0.07] shadow-card">
+    <div className="glass rounded-2xl p-5 flex flex-col gap-4 border-line/[0.07] shadow-card">
       <div className="flex items-start gap-3">
         <div
           className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl flex-shrink-0"
@@ -173,18 +173,18 @@ function ProfileCard({ profile, apps, allApps, launching, onLaunch, onEdit, onDe
           {profile.emoji || '🚀'}
         </div>
         <div className="flex-1 min-w-0 pt-0.5">
-          <h3 className="text-base font-semibold text-white/92 truncate">{profile.name}</h3>
-          <p className="text-xs text-white/35 mt-1">
+          <h3 className="text-base font-semibold text-fg/92 truncate">{profile.name}</h3>
+          <p className="text-xs text-fg/35 mt-1">
             {apps.length ? `Flujo de ${apps.length} app${apps.length !== 1 ? 's' : ''} en secuencia` : 'Sin apps asignadas'}
           </p>
         </div>
         <div className="flex gap-1.5">
           {!isEditing && (
-            <button onClick={onEdit} className="p-2 rounded-lg text-white/35 hover:text-white/80 hover:bg-white/[0.06] transition-all" title="Editar apps">
+            <button onClick={onEdit} className="p-2 rounded-lg text-fg/35 hover:text-fg/80 hover:bg-overlay/[0.06] transition-all" title="Editar apps">
               <Edit2 size={14} />
             </button>
           )}
-          <button onClick={onDelete} className="p-2 rounded-lg text-white/25 hover:text-red-400 hover:bg-red-500/10 transition-all" title="Eliminar perfil">
+          <button onClick={onDelete} className="p-2 rounded-lg text-fg/25 hover:text-red-400 hover:bg-red-500/10 transition-all" title="Eliminar perfil">
             <Trash2 size={14} />
           </button>
         </div>
@@ -192,21 +192,21 @@ function ProfileCard({ profile, apps, allApps, launching, onLaunch, onEdit, onDe
 
       {!isEditing ? (
         <>
-          <div className="min-h-[74px] rounded-xl bg-black/15 border border-white/[0.04] p-3">
+          <div className="min-h-[74px] rounded-xl bg-black/15 border border-line/[0.04] p-3">
             {apps.length > 0 ? (
               <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-2 flex-wrap text-[10px] text-white/34">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.04] border border-white/[0.05] px-2 py-1">
+                <div className="flex items-center gap-2 flex-wrap text-[10px] text-fg/34">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-overlay/[0.04] border border-line/[0.05] px-2 py-1">
                     <UserRound size={10} /> Personal {personalCount}
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.04] border border-white/[0.05] px-2 py-1">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-overlay/[0.04] border border-line/[0.05] px-2 py-1">
                     <BriefcaseBusiness size={10} /> Trabajo {workCount}
                   </span>
                 </div>
                 <div className="flex gap-2 flex-wrap">
                 {apps.map((a, index) => (
-                  <div key={a.id} className="flex items-center gap-2 text-xs text-white/62 bg-white/[0.045] border border-white/[0.05] rounded-lg px-2.5 py-1.5 max-w-full">
-                    <span className="text-[10px] text-white/30 font-mono">{index + 1}</span>
+                  <div key={a.id} className="flex items-center gap-2 text-xs text-fg/62 bg-overlay/[0.045] border border-line/[0.05] rounded-lg px-2.5 py-1.5 max-w-full">
+                    <span className="text-[10px] text-fg/30 font-mono">{index + 1}</span>
                     <AppIcon iconType={a.iconType} iconValue={a.iconValue} iconColor={a.iconColor} name={a.name} url={a.url} size={20} />
                     <span className="truncate max-w-[160px]">{a.name}</span>
                     {a.accountLabel && <span className="text-violet-300/80">({a.accountLabel})</span>}
@@ -215,7 +215,7 @@ function ProfileCard({ profile, apps, allApps, launching, onLaunch, onEdit, onDe
                 </div>
               </div>
             ) : (
-              <div className="h-full min-h-[48px] flex items-center text-xs text-white/28">
+              <div className="h-full min-h-[48px] flex items-center text-xs text-fg/28">
                 Usa editar para seleccionar las apps de este perfil.
               </div>
             )}
@@ -227,12 +227,12 @@ function ProfileCard({ profile, apps, allApps, launching, onLaunch, onEdit, onDe
               disabled={launching || apps.length === 0}
               className={`flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${
                 apps.length === 0
-                  ? 'bg-white/[0.04] text-white/24 cursor-default'
+                  ? 'bg-overlay/[0.04] text-fg/24 cursor-default'
                   : 'bg-violet-600 hover:bg-violet-500 text-white active:scale-[0.98] shadow-glow-sm'
               }`}
             >
               {launching
-                ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                ? <div className="w-4 h-4 border-2 border-line/40 border-t-white rounded-full animate-spin" />
                 : <Play size={14} fill="currentColor" />
               }
               {launching ? 'Ejecutando...' : `Ejecutar flujo (${apps.length})`}
@@ -240,7 +240,7 @@ function ProfileCard({ profile, apps, allApps, launching, onLaunch, onEdit, onDe
             <button
               onClick={() => firstSecureApp && onOpenTools?.(firstSecureApp, 'security')}
               disabled={!firstSecureApp}
-              className="px-3 rounded-xl bg-white/[0.04] text-white/35 hover:text-violet-300 hover:bg-violet-600/15 transition-all disabled:opacity-30"
+              className="px-3 rounded-xl bg-overlay/[0.04] text-fg/35 hover:text-violet-300 hover:bg-violet-600/15 transition-all disabled:opacity-30"
               title="Centro de seguridad"
             >
               <Shield size={14} />
@@ -248,7 +248,7 @@ function ProfileCard({ profile, apps, allApps, launching, onLaunch, onEdit, onDe
             <button
               onClick={() => apps[0] && onOpenTools?.(apps[0], 'scripts')}
               disabled={!apps[0]}
-              className="px-3 rounded-xl bg-white/[0.04] text-white/35 hover:text-violet-300 hover:bg-violet-600/15 transition-all disabled:opacity-30"
+              className="px-3 rounded-xl bg-overlay/[0.04] text-fg/35 hover:text-violet-300 hover:bg-violet-600/15 transition-all disabled:opacity-30"
               title="Scripts del flujo"
             >
               <Code2 size={14} />
@@ -260,7 +260,7 @@ function ProfileCard({ profile, apps, allApps, launching, onLaunch, onEdit, onDe
           <AppPicker apps={allApps} selectedIds={selectedIds} onToggle={toggle} />
           <div className="flex gap-2">
             <button onClick={handleSave} disabled={saving} className="btn-primary flex items-center gap-2 text-sm">
-              {saving ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <Save size={13} />}
+              {saving ? <div className="w-4 h-4 border-2 border-line/40 border-t-white rounded-full animate-spin" /> : <Save size={13} />}
               Guardar cambios
             </button>
             <button onClick={onStopEdit} className="btn-ghost text-sm flex items-center gap-2">
@@ -303,7 +303,7 @@ function CreateProfileForm({ apps, onSave, onCancel }) {
                 key={item}
                 onClick={() => setEmoji(item)}
                 className={`h-10 rounded-xl text-lg flex items-center justify-center transition-all ${
-                  emoji === item ? 'bg-violet-600/25 ring-1 ring-violet-400/55' : 'bg-white/[0.04] hover:bg-white/[0.08]'
+                  emoji === item ? 'bg-violet-600/25 ring-1 ring-violet-400/55' : 'bg-overlay/[0.04] hover:bg-overlay/[0.08]'
                 }`}
               >
                 {item}
@@ -347,7 +347,7 @@ function CreateProfileForm({ apps, onSave, onCancel }) {
 
         <div className="flex gap-2 pt-1">
           <button onClick={handleSave} disabled={!name.trim() || saving} className="btn-primary flex items-center gap-2 text-sm flex-1 justify-center py-2.5">
-            {saving ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <Rocket size={14} />}
+            {saving ? <div className="w-4 h-4 border-2 border-line/40 border-t-white rounded-full animate-spin" /> : <Rocket size={14} />}
             Crear perfil
           </button>
           <button onClick={onCancel} className="btn-ghost text-sm">Cancelar</button>
@@ -372,10 +372,10 @@ function AppPicker({ apps, selectedIds, onToggle }) {
   return (
     <div>
       <div className="flex items-center justify-between gap-3 mb-2">
-        <p className="text-xs text-white/40">Apps del perfil ({selectedIds.length} seleccionadas)</p>
+        <p className="text-xs text-fg/40">Apps del perfil ({selectedIds.length} seleccionadas)</p>
         {apps.length > 5 && (
           <div className="relative w-44">
-            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg/25 pointer-events-none" />
             <input
               value={query}
               onChange={e => setQuery(e.target.value)}
@@ -387,7 +387,7 @@ function AppPicker({ apps, selectedIds, onToggle }) {
       </div>
       <div className="max-h-56 overflow-y-auto scrollbar-thin flex flex-col gap-1 glass rounded-xl p-2">
         {filtered.length === 0 ? (
-          <div className="px-3 py-6 text-center text-xs text-white/30">No hay apps para mostrar.</div>
+          <div className="px-3 py-6 text-center text-xs text-fg/30">No hay apps para mostrar.</div>
         ) : filtered.map(app => {
           const selected = selectedIds.includes(app.id);
           return (
@@ -395,12 +395,12 @@ function AppPicker({ apps, selectedIds, onToggle }) {
               key={app.id}
               onClick={() => onToggle(app.id)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all border ${
-                selected ? 'bg-violet-600/15 border-violet-500/25' : 'hover:bg-white/[0.04] border-transparent'
+                selected ? 'bg-violet-600/15 border-violet-500/25' : 'hover:bg-overlay/[0.04] border-transparent'
               }`}
             >
-              {selected ? <CheckSquare size={14} className="text-violet-400 flex-shrink-0" /> : <Square size={14} className="text-white/22 flex-shrink-0" />}
+              {selected ? <CheckSquare size={14} className="text-violet-400 flex-shrink-0" /> : <Square size={14} className="text-fg/22 flex-shrink-0" />}
               <AppIcon iconType={app.iconType} iconValue={app.iconValue} iconColor={app.iconColor} name={app.name} url={app.url} size={24} />
-              <span className="text-sm text-white/72 truncate">{app.name}</span>
+              <span className="text-sm text-fg/72 truncate">{app.name}</span>
               {app.accountLabel && <span className="text-[10px] text-violet-300/80 ml-auto flex-shrink-0">({app.accountLabel})</span>}
             </button>
           );
@@ -417,8 +417,8 @@ function EmptyState({ hasApps, onCreate }) {
         🚀
       </div>
       <div className="text-center max-w-sm">
-        <h3 className="text-base font-semibold text-white/82 mb-1.5">Sin perfiles todavia</h3>
-        <p className="text-sm text-white/36 leading-relaxed">
+        <h3 className="text-base font-semibold text-fg/82 mb-1.5">Sin perfiles todavia</h3>
+        <p className="text-sm text-fg/36 leading-relaxed">
           {hasApps
             ? 'Crea un perfil para abrir grupos de apps de trabajo, estudio o clientes en una sola accion.'
             : 'Primero crea algunas apps y luego agrupalas en perfiles de lanzamiento.'}

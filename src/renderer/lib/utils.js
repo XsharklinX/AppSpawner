@@ -33,6 +33,21 @@ export function formatRelativeTime(timestamp, lang = 'es') {
 }
 
 /**
+ * Formatea una duración en milisegundos como texto corto (ej. "2h 15m", "45m", "<1m").
+ * @param {number} ms
+ * @returns {string}
+ */
+export function formatDuration(ms) {
+  if (!ms || ms < 60000) return '<1m';
+  const totalMinutes = Math.floor(ms / 60000);
+  const hours   = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+}
+
+/**
  * Formatea bytes en una unidad legible.
  * @param {number} bytes
  * @returns {string}

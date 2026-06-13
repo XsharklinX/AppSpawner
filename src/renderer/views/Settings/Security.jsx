@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Copy, LockKeyhole, Save, ShieldCheck, TimerReset, UsersRound } from 'lucide-react';
+import { AlertTriangle, Copy, LockKeyhole, Save, ShieldCheck, TimerReset, UsersRound } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 
 export default function Security() {
@@ -11,9 +11,11 @@ export default function Security() {
   const [resetCode, setResetCode] = useState('');
   const [resetPin, setResetPin] = useState('');
   const [busy, setBusy] = useState(false);
+  const [encryptionAvailable, setEncryptionAvailable] = useState(true);
 
   useEffect(() => {
     window.electronAPI?.getSettings?.().then(setSettings).catch(() => {});
+    window.electronAPI?.getEncryptionStatus?.().then(s => setEncryptionAvailable(s?.available ?? true)).catch(() => {});
   }, []);
 
   const savePin = async () => {
@@ -82,13 +84,26 @@ export default function Security() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h2 className="text-base font-semibold text-white mb-0.5 flex items-center gap-2">
+        <h2 className="text-base font-semibold text-fg mb-0.5 flex items-center gap-2">
           <ShieldCheck size={16} className="text-violet-400" /> Seguridad y automatizacion
         </h2>
-        <p className="text-sm text-white/35 leading-relaxed max-w-2xl">
+        <p className="text-sm text-fg/35 leading-relaxed max-w-2xl">
           Define el PIN local, endurece el vault y separa apps personales de trabajo.
         </p>
       </div>
+
+      {!encryptionAvailable && (
+        <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.06] p-3 flex items-start gap-3">
+          <AlertTriangle size={16} className="text-amber-300 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs font-semibold text-amber-200">Cifrado del sistema no disponible</p>
+            <p className="text-[11px] text-amber-100/55 mt-1 leading-relaxed">
+              Tu sistema operativo no provee un almacen de cifrado (DPAPI/Keychain/libsecret). Las contrasenas
+              y codigos TOTP guardados se almacenan solo codificados en base64, no cifrados.
+            </p>
+          </div>
+        </div>
+      )}
 
       <section className="glass rounded-xl p-4 flex flex-col gap-4">
         <div className="flex items-start gap-3">
@@ -96,16 +111,16 @@ export default function Security() {
             <LockKeyhole size={16} />
           </div>
           <div>
-            <p className="text-sm font-semibold text-white/82">PIN global para apps sensibles</p>
-            <p className="text-xs text-white/35 mt-1">
+            <p className="text-sm font-semibold text-fg/82">PIN global para apps sensibles</p>
+            <p className="text-xs text-fg/35 mt-1">
               Se guarda como hash PBKDF2 local. No se exporta en texto plano.
             </p>
           </div>
         </div>
 
         <div className="grid md:grid-cols-2 gap-3">
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
-            <p className="text-xs text-white/35 mb-2">{settings?.securityPinHash ? 'Cambiar PIN' : 'Crear PIN'}</p>
+          <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.025] p-3">
+            <p className="text-xs text-fg/35 mb-2">{settings?.securityPinHash ? 'Cambiar PIN' : 'Crear PIN'}</p>
             <div className="flex gap-2">
               <input
                 type="password"
@@ -121,8 +136,8 @@ export default function Security() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
-            <p className="text-xs text-white/35 mb-2">Eliminar PIN actual</p>
+          <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.025] p-3">
+            <p className="text-xs text-fg/35 mb-2">Eliminar PIN actual</p>
             <div className="flex gap-2">
               <input
                 type="password"
@@ -154,8 +169,8 @@ export default function Security() {
           </div>
         )}
 
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
-          <p className="text-xs text-white/35 mb-2">Recuperar PIN con codigo</p>
+        <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.025] p-3">
+          <p className="text-xs text-fg/35 mb-2">Recuperar PIN con codigo</p>
           <div className="grid md:grid-cols-[1fr_160px_auto] gap-2">
             <input
               type="text"
@@ -198,8 +213,8 @@ export default function Security() {
               <TimerReset size={16} />
             </div>
             <div>
-              <p className="text-sm font-semibold text-white/82">Timeout del vault</p>
-              <p className="text-xs text-white/35 mt-1">Base para cerrar sesiones sensibles cuando se agregue desbloqueo persistente.</p>
+              <p className="text-sm font-semibold text-fg/82">Timeout del vault</p>
+              <p className="text-xs text-fg/35 mt-1">Base para cerrar sesiones sensibles cuando se agregue desbloqueo persistente.</p>
             </div>
           </div>
           <input
@@ -224,11 +239,11 @@ function SettingRow({ icon: Icon, title, description, checked, onChange }) {
           <Icon size={16} />
         </div>
         <div>
-          <p className="text-sm font-semibold text-white/82">{title}</p>
-          <p className="text-xs text-white/35 mt-1">{description}</p>
+          <p className="text-sm font-semibold text-fg/82">{title}</p>
+          <p className="text-xs text-fg/35 mt-1">{description}</p>
         </div>
       </div>
-      <button onClick={onChange} className={`relative w-10 h-6 rounded-full transition-colors ${checked ? 'bg-violet-600' : 'bg-white/12'}`}>
+      <button onClick={onChange} className={`relative w-10 h-6 rounded-full transition-colors ${checked ? 'bg-violet-600' : 'bg-overlay/12'}`}>
         <span className={`absolute left-1 top-1 w-4 h-4 rounded-full bg-white transition-transform ${checked ? 'translate-x-4' : 'translate-x-0'}`} />
       </button>
     </div>

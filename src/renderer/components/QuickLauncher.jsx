@@ -95,15 +95,15 @@ export default function QuickLauncher({ onClose, onNavigate, onOpenTools }) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg mx-4 rounded-2xl overflow-hidden shadow-2xl border border-white/[0.08]"
+        className="w-full max-w-lg mx-4 rounded-2xl overflow-hidden shadow-2xl border border-line/[0.08]"
         style={{ background: '#111118' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Input */}
-        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.06]">
+        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-line/[0.06]">
           {isCommandMode
             ? <ArrowRight size={16} className="text-violet-400 flex-shrink-0" />
-            : <Search size={16} className="text-white/30 flex-shrink-0" />
+            : <Search size={16} className="text-fg/30 flex-shrink-0" />
           }
           <input
             ref={inputRef}
@@ -112,21 +112,21 @@ export default function QuickLauncher({ onClose, onNavigate, onOpenTools }) {
             onChange={e => setQuery(e.target.value)}
             onKeyDown={handleKey}
             placeholder={isCommandMode ? 'Comando… (settings, nueva app…)' : 'Buscar app y lanzar… o escribe > para comandos'}
-            className="flex-1 bg-transparent text-white placeholder-white/25 text-sm outline-none"
+            className="flex-1 bg-transparent text-fg placeholder-fg/25 text-sm outline-none"
           />
           {query && (
-            <button onClick={() => setQuery('')} className="text-white/25 hover:text-white/60 transition-colors">
+            <button onClick={() => setQuery('')} className="text-fg/25 hover:text-fg/60 transition-colors">
               <X size={14} />
             </button>
           )}
-          <kbd className="text-[10px] text-white/20 border border-white/10 rounded px-1.5 py-0.5 font-mono">ESC</kbd>
+          <kbd className="text-[10px] text-fg/20 border border-line/10 rounded px-1.5 py-0.5 font-mono">ESC</kbd>
         </div>
 
         {/* Lista */}
         <div ref={listRef} className="max-h-72 overflow-y-auto scrollbar-thin py-1.5">
           {isCommandMode ? (
             filteredCommands.length === 0 ? (
-              <div className="flex items-center justify-center py-8 text-sm text-white/25">
+              <div className="flex items-center justify-center py-8 text-sm text-fg/25">
                 Sin comandos para "{commandQuery}"
               </div>
             ) : (
@@ -137,17 +137,17 @@ export default function QuickLauncher({ onClose, onNavigate, onOpenTools }) {
                     key={cmd.id}
                     onClick={() => handleRunCommand(cmd)}
                     onMouseEnter={() => setCursor(i)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${i === cursor ? 'bg-violet-600/15' : 'hover:bg-white/[0.03]'}`}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${i === cursor ? 'bg-violet-600/15' : 'hover:bg-overlay/[0.03]'}`}
                   >
                     <div className="w-8 h-8 rounded-lg bg-violet-600/15 border border-violet-500/20 flex items-center justify-center flex-shrink-0">
                       <Icon size={15} className="text-violet-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white/85">{cmd.label}</p>
-                      <p className="text-[11px] text-white/30">{cmd.hint}</p>
+                      <p className="text-sm font-medium text-fg/85">{cmd.label}</p>
+                      <p className="text-[11px] text-fg/30">{cmd.hint}</p>
                     </div>
                     {i === cursor && (
-                      <kbd className="text-[10px] text-white/30 border border-white/10 rounded px-1.5 py-0.5 font-mono flex-shrink-0">↵</kbd>
+                      <kbd className="text-[10px] text-fg/30 border border-line/10 rounded px-1.5 py-0.5 font-mono flex-shrink-0">↵</kbd>
                     )}
                   </button>
                 );
@@ -155,7 +155,7 @@ export default function QuickLauncher({ onClose, onNavigate, onOpenTools }) {
             )
           ) : (
             filteredApps.length === 0 ? (
-              <div className="flex flex-col items-center gap-1.5 py-8 text-sm text-white/25">
+              <div className="flex flex-col items-center gap-1.5 py-8 text-sm text-fg/25">
                 <span>Sin resultados para "{query}"</span>
                 <button onClick={() => setQuery('>')} className="text-xs text-violet-400/60 hover:text-violet-400 transition-colors mt-1">
                   Buscar en comandos →
@@ -169,7 +169,7 @@ export default function QuickLauncher({ onClose, onNavigate, onOpenTools }) {
                     key={app.id}
                     onClick={() => handleLaunchApp(app)}
                     onMouseEnter={() => setCursor(i)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${i === cursor ? 'bg-violet-600/15' : 'hover:bg-white/[0.03]'}`}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${i === cursor ? 'bg-violet-600/15' : 'hover:bg-overlay/[0.03]'}`}
                   >
                     <div className="relative flex-shrink-0">
                       <AppIcon
@@ -188,17 +188,17 @@ export default function QuickLauncher({ onClose, onNavigate, onOpenTools }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-white/85 truncate">{app.name}</span>
+                        <span className="text-sm font-medium text-fg/85 truncate">{app.name}</span>
                         {app.accountLabel && (
                           <span className="text-[9px] text-violet-400/80 bg-violet-500/10 px-1.5 py-0.5 rounded-full border border-violet-500/20 flex-shrink-0">
                             {app.accountLabel}
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-white/30 truncate">{app.url}</p>
+                      <p className="text-[11px] text-fg/30 truncate">{app.url}</p>
                     </div>
                     {i === cursor && (
-                      <kbd className="text-[10px] text-white/30 border border-white/10 rounded px-1.5 py-0.5 font-mono flex-shrink-0">↵</kbd>
+                      <kbd className="text-[10px] text-fg/30 border border-line/10 rounded px-1.5 py-0.5 font-mono flex-shrink-0">↵</kbd>
                     )}
                   </button>
                 );
@@ -208,11 +208,11 @@ export default function QuickLauncher({ onClose, onNavigate, onOpenTools }) {
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-2 border-t border-white/[0.05] flex items-center gap-4 text-[10px] text-white/20">
-          <span className="flex items-center gap-1"><kbd className="border border-white/10 rounded px-1 font-mono">↑↓</kbd> navegar</span>
-          <span className="flex items-center gap-1"><kbd className="border border-white/10 rounded px-1 font-mono">↵</kbd> abrir</span>
+        <div className="px-4 py-2 border-t border-line/[0.05] flex items-center gap-4 text-[10px] text-fg/20">
+          <span className="flex items-center gap-1"><kbd className="border border-line/10 rounded px-1 font-mono">↑↓</kbd> navegar</span>
+          <span className="flex items-center gap-1"><kbd className="border border-line/10 rounded px-1 font-mono">↵</kbd> abrir</span>
           <span className="flex items-center gap-1">
-            <kbd className="border border-white/10 rounded px-1 font-mono">&gt;</kbd>
+            <kbd className="border border-line/10 rounded px-1 font-mono">&gt;</kbd>
             <span className="text-violet-400/50">comandos</span>
           </span>
           <span className="ml-auto flex items-center gap-1">

@@ -43,8 +43,8 @@ export default function Settings() {
     <div className="h-full flex overflow-hidden">
 
       {/* ── Sidebar interna de ajustes ─────────────────────────────────── */}
-      <aside className="w-52 flex-shrink-0 border-r border-white/[0.05] p-3 flex flex-col gap-0.5 pt-6">
-        <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest px-3 pb-2">
+      <aside className="w-52 flex-shrink-0 border-r border-line/[0.05] p-3 flex flex-col gap-0.5 pt-6">
+        <p className="text-[10px] font-semibold text-fg/25 uppercase tracking-widest px-3 pb-2">
           {t('set_title')}
         </p>
         {TABS.map(tab => {
@@ -59,11 +59,11 @@ export default function Settings() {
                 transition-all duration-150 text-left
                 ${active
                   ? 'bg-violet-600/20 text-violet-300 border border-violet-500/25'
-                  : 'text-white/45 hover:text-white/75 hover:bg-white/[0.04]'
+                  : 'text-fg/45 hover:text-fg/75 hover:bg-overlay/[0.04]'
                 }
               `}
             >
-              <Icon size={15} className={active ? 'text-violet-400' : 'text-white/25'} />
+              <Icon size={15} className={active ? 'text-violet-400' : 'text-fg/25'} />
               {tab.label || t(tab.key)}
             </button>
           );

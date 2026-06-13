@@ -1,13 +1,13 @@
 import React from 'react';
 import {
   LayoutGrid, Compass, Plus, Settings, Download, History,
-  Box, Briefcase, Users, Tv, Code2, Sparkles, Globe, Rocket,
+  Box, Briefcase, Users, Tv, Code2, Sparkles, Globe, Rocket, BarChart3,
 } from 'lucide-react';
 import { useApps }       from '../../contexts/AppContext';
 import { useI18n }       from '../../contexts/I18nContext';
 import { useWorkspaces } from '../../contexts/WorkspaceContext';
 import { countByCategory } from '../../lib/utils';
-import { CATEGORIES }    from '../../lib/constants';
+import { CATEGORIES, APP_VERSION, APP_BUILD } from '../../lib/constants';
 
 const CATEGORY_ICONS = {
   all:            Globe,
@@ -24,6 +24,7 @@ const NAV_ITEMS = [
   { id: 'discover',  icon: Compass,    key: 'nav_discover' },
   { id: 'create',    icon: Plus,       key: 'nav_create'   },
   { id: 'profiles',  icon: Rocket,     key: 'nav_profiles' },
+  { id: 'insights',  icon: BarChart3,  key: 'nav_insights' },
   { id: 'settings',  icon: Settings,   key: 'nav_settings' },
 ];
 
@@ -207,7 +208,7 @@ export default function Sidebar({
           </div>
           <div className="min-w-0">
             <p className="text-xs font-medium text-fg/70 truncate">AppSpawner</p>
-            <p className="text-[10px] text-fg/30">v2.5 Premium</p>
+            <p className="text-[10px] text-fg/30">v{APP_VERSION} {APP_BUILD}</p>
           </div>
         </div>
       </div>

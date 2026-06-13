@@ -20,8 +20,8 @@ export default function Tooltip({ label, position = 'top', children, className =
         role="tooltip"
         className={`
           pointer-events-none absolute z-[60] whitespace-nowrap
-          px-2 py-1 rounded-lg text-[11px] font-medium text-white/90
-          border border-white/[0.08] shadow-card
+          px-2 py-1 rounded-lg text-[11px] font-medium text-fg/90
+          border border-line/[0.08] shadow-card
           opacity-0 scale-95 -translate-y-0.5
           group-hover/tooltip:opacity-100 group-hover/tooltip:scale-100 group-hover/tooltip:translate-y-0
           group-focus-within/tooltip:opacity-100 group-focus-within/tooltip:scale-100 group-focus-within/tooltip:translate-y-0

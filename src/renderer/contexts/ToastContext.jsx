@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useCallback, useReducer, useRef, useEffect } from 'react';
 import { CheckCircle2, XCircle, AlertCircle, Info, X } from 'lucide-react';
+import { useSound } from './SoundContext';
 
 /**
  * ToastContext — Sistema de notificaciones flotantes.
@@ -59,13 +60,13 @@ function Toast({ toast, onDismiss }) {
       <Icon size={18} className={`${iconCls} flex-shrink-0 mt-0.5`} />
       <div className="flex-1 min-w-0">
         {toast.title && (
-          <p className="text-sm font-semibold text-white mb-0.5">{toast.title}</p>
+          <p className="text-sm font-semibold text-fg mb-0.5">{toast.title}</p>
         )}
-        <p className="text-sm text-white/70 leading-snug">{toast.message}</p>
+        <p className="text-sm text-fg/70 leading-snug">{toast.message}</p>
       </div>
       <button
         onClick={() => onDismiss(toast.id)}
-        className="no-drag flex-shrink-0 text-white/30 hover:text-white/70 transition-colors"
+        className="no-drag flex-shrink-0 text-fg/30 hover:text-fg/70 transition-colors"
       >
         <X size={14} />
       </button>
@@ -76,6 +77,7 @@ function Toast({ toast, onDismiss }) {
 export function ToastProvider({ children }) {
   const [toasts, dispatch] = useReducer(toastReducer, []);
   const timers = useRef(new Map());
+  const { playSound } = useSound();
 
   const dismiss = useCallback((id) => {
     dispatch({ type: 'REMOVE', id });
@@ -86,13 +88,14 @@ export function ToastProvider({ children }) {
   const toast = useCallback(({ type = 'info', title, message, duration = AUTO_DISMISS_MS }) => {
     const id = ++toastId;
     dispatch({ type: 'ADD', toast: { id, type, title, message } });
+    playSound(type === 'info' ? 'notification' : type);
 
     if (duration > 0) {
       const timer = setTimeout(() => dismiss(id), duration);
       timers.current.set(id, timer);
     }
     return id;
-  }, [dismiss]);
+  }, [dismiss, playSound]);
 
   // API de conveniencia
   const success = useCallback((msg, title) => toast({ type: 'success', message: msg, title }), [toast]);

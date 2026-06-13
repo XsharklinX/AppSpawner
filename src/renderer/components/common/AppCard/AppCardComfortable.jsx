@@ -1,105 +1,16 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { Play, Settings2, Trash2, Clock, Pin, PinOff, Camera, Code2, Shield, Share2, LogIn, Stethoscope, KeyRound, LockKeyhole, Network, PanelTop, BadgeCheck } from 'lucide-react';
-import AppIcon               from './AppIcon';
-import Tooltip               from './Tooltip';
-import { useApps }            from '../../contexts/AppContext';
-import { useI18n }            from '../../contexts/I18nContext';
-import { useToast }           from '../../contexts/ToastContext';
-import { formatRelativeTime } from '../../lib/utils';
+import React from 'react';
+import { Play, Settings2, Trash2, Clock, Pin, PinOff, Star, Camera, Code2, Shield, Share2, LogIn, Stethoscope, AlertTriangle } from 'lucide-react';
+import AppIcon from '../AppIcon';
+import Tooltip from '../Tooltip';
+import { SelectionCheckbox, FavoriteBadge } from './shared';
 
-/**
- * AppCard — Tarjeta de app instalada. Memoizada con React.memo
- * para evitar re-renders innecesarios cuando cambian otras apps.
- */
-const AppCard = React.memo(function AppCard({ app, onEdit, onOpenTools }) {
-  const [hovered,      setHovered]      = useState(false);
-  const [launching,    setLaunching]    = useState(false);
-  const [confirm,      setConfirm]      = useState(false);
-  const [loginAlert,   setLoginAlert]   = useState(false);
-  const [toolState,    setToolState]    = useState({ scripts: false, vault: false, totp: false });
-
-  const { launchApp, uninstallApp, togglePin, isWindowOpen, badgeCounts } = useApps();
-  const { t, language } = useI18n();
-  const toast = useToast();
-
-  const windowOpen     = isWindowOpen(app.id);
-  const relativeTime   = formatRelativeTime(app.lastUsed, language);
-  const badgeCount     = badgeCounts?.[app.id] || 0;
-
-  useEffect(() => {
-    let alive = true;
-    Promise.all([
-      window.electronAPI?.getScripts?.(app.id).catch(() => null),
-      window.electronAPI?.listCredentials?.(app.id).catch(() => []),
-      window.electronAPI?.listTotp?.(app.id).catch(() => []),
-    ]).then(([scripts, creds, totp]) => {
-      if (!alive) return;
-      setToolState({
-        scripts: !!scripts && scripts.enabled !== false && !!((scripts.css || '').trim() || (scripts.js || '').trim()),
-        vault: Array.isArray(creds) && creds.length > 0,
-        totp: Array.isArray(totp) && totp.length > 0,
-      });
-    });
-    return () => { alive = false; };
-  }, [app.id]);
-
-  const statusItems = [
-    { key: 'adblock', active: app.adblockEnabled !== false, icon: Shield, label: 'AdBlock' },
-    { key: 'scripts', active: toolState.scripts, icon: Code2, label: 'Scripts' },
-    { key: 'vault', active: toolState.vault, icon: KeyRound, label: 'Vault' },
-    { key: 'totp', active: toolState.totp, icon: BadgeCheck, label: '2FA' },
-    { key: 'pin', active: !!app.security?.locked, icon: LockKeyhole, label: 'PIN' },
-    { key: 'proxy', active: !!app.proxy?.enabled, icon: Network, label: 'Proxy' },
-    { key: 'toolbar', active: !!app.toolbar?.enabled, icon: PanelTop, label: 'Toolbar' },
-  ].filter(item => item.active);
-
-  const handleLaunch = useCallback(async (e) => {
-    e?.stopPropagation?.();
-    if (launching) return;
-    setLaunching(true);
-    try {
-      await launchApp(app.id);
-    } finally {
-      // Mantener spinner un momento para que el usuario vea el feedback
-      setTimeout(() => setLaunching(false), 800);
-    }
-  }, [launching, launchApp, app.id]);
-
-  const handleUninstall = useCallback(async (e) => {
-    e.stopPropagation();
-    if (!confirm) {
-      setConfirm(true);
-      setTimeout(() => setConfirm(false), 3500);
-      return;
-    }
-    await uninstallApp(app.id);
-  }, [confirm, uninstallApp, app.id]);
-
-  const handlePin = useCallback((e) => {
-    e.stopPropagation();
-    togglePin(app.id);
-  }, [togglePin, app.id]);
-
-  // Escuchar eventos de "login form detectado" del main process
-  useEffect(() => {
-    const unsub = window.electronAPI?.onLoginFormDetected?.((data) => {
-      if (data.appId === app.id) setLoginAlert(true);
-    });
-    return () => unsub?.();
-  }, [app.id]);
-
-  const handleEasyLogin = useCallback(async (e) => {
-    e.stopPropagation();
-    await window.electronAPI?.openLoginWindow(app.id);
-  }, [app]);
-
-  const handleShare = useCallback((e) => {
-    e.stopPropagation();
-    const params = new URLSearchParams({ url: app.url, name: app.name, category: app.category || 'general', iconColor: app.iconColor });
-    navigator.clipboard.writeText(`appspawner://install?${params.toString()}`);
-    toast.success('Enlace copiado', 'Compártelo para instalar esta app');
-  }, [app, toast]);
-
+export default function AppCardComfortable({
+  app, hovered, setHovered, confirm, setConfirm, selected, selectionMode,
+  windowOpen, relativeTime, badgeCount, statusItems, launching, hasProblem,
+  loginAlert, setLoginAlert, t,
+  onEdit, onOpenTools, onSelect, handleLaunch, handleUninstall, handlePin,
+  handleFavorite, handleEasyLogin, handleShare,
+}) {
   return (
     <div
       className={`
@@ -107,6 +18,8 @@ const AppCard = React.memo(function AppCard({ app, onEdit, onOpenTools }) {
         transition-all duration-200 min-h-[164px]
         ${hovered ? 'shadow-card-hover -translate-y-[3px] border-line/[0.12]' : 'shadow-card'}
         ${app.pinned ? 'ring-1 ring-violet-500/25' : ''}
+        ${selected ? 'ring-1 ring-violet-500/50' : ''}
+        ${launching ? 'animate-press-flash' : ''}
       `}
       onMouseEnter={() => { setHovered(true); setConfirm(false); }}
       onMouseLeave={() => { setHovered(false); setConfirm(false); }}
@@ -127,17 +40,26 @@ const AppCard = React.memo(function AppCard({ app, onEdit, onOpenTools }) {
         style={{ background: `radial-gradient(ellipse at 50% 0%, ${app.iconColor}20 0%, transparent 60%)` }}
       />
 
-      {/* Indicador ventana abierta */}
-      {windowOpen && (
-        <div className="absolute top-3.5 right-3.5 flex items-center gap-1.5 z-10">
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+      {/* Selección / Indicador ventana abierta */}
+      <div className="absolute top-3.5 right-3.5 flex items-center gap-1.5 z-10">
+        {windowOpen && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+      </div>
+
+      {selectionMode && (
+        <div className="absolute top-3 left-3 z-10">
+          <SelectionCheckbox selectionMode={selectionMode} selected={selected} onToggle={onSelect} />
         </div>
       )}
 
-      {/* Pin */}
-      {app.pinned && !hovered && (
-        <div className="absolute top-3 right-3 z-10">
-          <Pin size={10} className="text-violet-400/70" />
+      {/* Pin / problema */}
+      {!selectionMode && (app.pinned || hasProblem) && !hovered && (
+        <div className="absolute top-3 right-3 z-10 flex items-center gap-1">
+          {hasProblem && (
+            <Tooltip label="Errores de carga recientes">
+              <AlertTriangle size={11} className="text-amber-400/80" />
+            </Tooltip>
+          )}
+          {app.pinned && <Pin size={10} className="text-violet-400/70" />}
         </div>
       )}
 
@@ -160,8 +82,9 @@ const AppCard = React.memo(function AppCard({ app, onEdit, onOpenTools }) {
 
         {/* Nombre */}
         <div>
-          <h3 className="text-sm font-bold text-fg/90 leading-tight truncate">
+          <h3 className="text-sm font-bold text-fg/90 leading-tight truncate flex items-center gap-1.5">
             {app.name}
+            <FavoriteBadge favorite={app.favorite} />
           </h3>
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
             <span className="category-badge capitalize">{app.category || 'general'}</span>
@@ -179,13 +102,13 @@ const AppCard = React.memo(function AppCard({ app, onEdit, onOpenTools }) {
               <span
                 key={key}
                 title={label}
-                className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.035] px-1.5 py-1 text-[9px] font-semibold text-fg/42"
+                className="inline-flex items-center gap-1 rounded-md border border-line/[0.06] bg-overlay/[0.035] px-1.5 py-1 text-[9px] font-semibold text-fg/42"
               >
                 <Icon size={10} /> {label}
               </span>
             ))}
             {statusItems.length > 5 && (
-              <span className="rounded-md border border-white/[0.06] bg-white/[0.035] px-1.5 py-1 text-[9px] font-semibold text-fg/35">
+              <span className="rounded-md border border-line/[0.06] bg-overlay/[0.035] px-1.5 py-1 text-[9px] font-semibold text-fg/35">
                 +{statusItems.length - 5}
               </span>
             )}
@@ -207,7 +130,7 @@ const AppCard = React.memo(function AppCard({ app, onEdit, onOpenTools }) {
         className={`
           absolute inset-0 flex flex-col gap-2 p-3.5
           transition-opacity duration-150
-          ${hovered ? 'opacity-100' : 'opacity-0 pointer-events-none'}
+          ${hovered && !selectionMode ? 'opacity-100' : 'opacity-0 pointer-events-none'}
         `}
         style={{ background: 'rgba(12,12,18,0.96)', backdropFilter: 'blur(8px)' }}
       >
@@ -231,6 +154,16 @@ const AppCard = React.memo(function AppCard({ app, onEdit, onOpenTools }) {
           >
             <Settings2 size={13} /> Editar
           </button>
+          <Tooltip label={app.favorite ? 'Quitar de favoritos' : 'Marcar favorito'}>
+            <button
+              onClick={handleFavorite}
+              className={`flex items-center justify-center rounded-xl px-3 py-2.5 transition-all ${
+                app.favorite ? 'bg-amber-500/20 text-amber-400' : 'bg-overlay/[0.05] text-fg/40 hover:text-amber-400'
+              }`}
+            >
+              <Star size={13} fill={app.favorite ? 'currentColor' : 'none'} />
+            </button>
+          </Tooltip>
           <Tooltip label={app.pinned ? 'Desfijar' : 'Fijar'}>
             <button
               onClick={handlePin}
@@ -276,9 +209,4 @@ const AppCard = React.memo(function AppCard({ app, onEdit, onOpenTools }) {
       </div>
     </div>
   );
-}, (prev, next) => {
-  // Comparación personalizada: solo re-renderizar si la app cambia
-  return prev.app === next.app && prev.onEdit === next.onEdit && prev.onOpenTools === next.onOpenTools;
-});
-
-export default AppCard;
+}

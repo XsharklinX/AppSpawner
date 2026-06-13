@@ -62,6 +62,24 @@ function registerShortcutHandlers(ipcMain, store) {
   });
 }
 
+/**
+ * Recrea los accesos directos habilitados (escritorio/menú inicio) de una app.
+ * Se usa cuando icono, nombre o modo de apertura cambian, para que el
+ * acceso directo existente quede en sincronía sin pasar por el IPC.
+ * @param {object} appConfig
+ * @param {object} settings - data.settings (desktopShortcuts/startMenuShortcuts)
+ */
+async function recreateShortcuts(appConfig, settings = {}) {
+  const results = {};
+  if (settings.desktopShortcuts) {
+    results.desktop = await _createShortcut(appConfig, 'desktop');
+  }
+  if (settings.startMenuShortcuts) {
+    results.startMenu = await _createShortcut(appConfig, 'startMenu');
+  }
+  return results;
+}
+
 // ── Dispatcher por plataforma ─────────────────────────────────────────────────
 
 async function _createShortcut(appConfig, type) {
@@ -246,4 +264,4 @@ function _linuxRemove(appConfig) {
   targets.forEach(p => { try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch {} });
 }
 
-module.exports = { registerShortcutHandlers };
+module.exports = { registerShortcutHandlers, recreateShortcuts };

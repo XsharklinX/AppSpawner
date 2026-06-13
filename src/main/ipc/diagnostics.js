@@ -52,6 +52,15 @@ function registerDiagnosticsHandlers(ipcMain, store, getSessionSize) {
     loadErrors.delete(appId);
     return true;
   });
+
+  // Apps con errores de carga registrados desde el último arranque/limpieza.
+  ipcMain.handle('diagnostics:get-problem-apps', () => {
+    const result = {};
+    for (const [appId, log] of loadErrors.entries()) {
+      if (log.length > 0) result[appId] = log.length;
+    }
+    return result;
+  });
 }
 
 module.exports = {

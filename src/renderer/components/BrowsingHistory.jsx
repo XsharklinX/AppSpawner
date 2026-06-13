@@ -55,41 +55,41 @@ export default function BrowsingHistory({ onClose }) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl border border-white/[0.08] flex flex-col"
+        className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl border border-line/[0.08] flex flex-col"
         style={{ background: '#111118', maxHeight: '82vh' }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/[0.06]">
+        <div className="flex items-center justify-between px-4 py-3.5 border-b border-line/[0.06]">
           <div className="flex items-center gap-2.5">
             <History size={16} className="text-violet-400" />
-            <h2 className="text-sm font-semibold text-white/85">Historial</h2>
+            <h2 className="text-sm font-semibold text-fg/85">Historial</h2>
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={handleClear} className="text-[11px] text-white/35 hover:text-white/70 transition-colors px-2 py-1 rounded-lg hover:bg-white/[0.05]">
+            <button onClick={handleClear} className="text-[11px] text-fg/35 hover:text-fg/70 transition-colors px-2 py-1 rounded-lg hover:bg-overlay/[0.05]">
               Borrar {appFilter ? 'de esta app' : 'todo'}
             </button>
-            <button onClick={onClose} className="p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition-colors">
+            <button onClick={onClose} className="p-1.5 rounded-lg text-fg/30 hover:text-fg/70 hover:bg-overlay/[0.06] transition-colors">
               <X size={16} />
             </button>
           </div>
         </div>
 
-        <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center gap-2">
-          <Search size={14} className="text-white/25 flex-shrink-0" />
+        <div className="px-4 py-2.5 border-b border-line/[0.06] flex items-center gap-2">
+          <Search size={14} className="text-fg/25 flex-shrink-0" />
           <input
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Buscar en el historial…"
-            className="flex-1 bg-transparent text-sm text-white placeholder-white/25 outline-none"
+            className="flex-1 bg-transparent text-sm text-fg placeholder-fg/25 outline-none"
           />
         </div>
 
         {appsWithHistory.length > 0 && (
-          <div className="px-3 py-2 border-b border-white/[0.06] flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+          <div className="px-3 py-2 border-b border-line/[0.06] flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
             <button
               onClick={() => setAppFilter(null)}
-              className={`flex-shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors ${!appFilter ? 'bg-violet-600/25 text-violet-300' : 'bg-white/[0.04] text-white/40 hover:text-white/60'}`}
+              className={`flex-shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors ${!appFilter ? 'bg-violet-600/25 text-violet-300' : 'bg-overlay/[0.04] text-fg/40 hover:text-fg/60'}`}
             >
               Todas
             </button>
@@ -97,7 +97,7 @@ export default function BrowsingHistory({ onClose }) {
               <button
                 key={a.id}
                 onClick={() => setAppFilter(a.id)}
-                className={`flex-shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors truncate max-w-[120px] ${appFilter === a.id ? 'bg-violet-600/25 text-violet-300' : 'bg-white/[0.04] text-white/40 hover:text-white/60'}`}
+                className={`flex-shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors truncate max-w-[120px] ${appFilter === a.id ? 'bg-violet-600/25 text-violet-300' : 'bg-overlay/[0.04] text-fg/40 hover:text-fg/60'}`}
               >
                 {a.name}
               </button>
@@ -105,7 +105,7 @@ export default function BrowsingHistory({ onClose }) {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto scrollbar-thin divide-y divide-white/[0.04]">
+        <div className="flex-1 overflow-y-auto scrollbar-thin divide-y divide-line/[0.04]">
           {loading ? (
             <EmptyState loading title="Cargando…" />
           ) : items.length === 0 ? (
@@ -115,25 +115,25 @@ export default function BrowsingHistory({ onClose }) {
             />
           ) : (
             items.map(item => (
-              <div key={item.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.03] transition-colors group">
-                <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center flex-shrink-0 overflow-hidden">
+              <div key={item.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-overlay/[0.03] transition-colors group">
+                <div className="w-7 h-7 rounded-lg bg-overlay/[0.04] border border-line/[0.06] flex items-center justify-center flex-shrink-0 overflow-hidden">
                   {faviconFor(item.url)
                     ? <img src={faviconFor(item.url)} alt="" className="w-4 h-4" onError={e => { e.currentTarget.style.display = 'none'; }} />
-                    : <Globe size={13} className="text-white/30" />}
+                    : <Globe size={13} className="text-fg/30" />}
                 </div>
                 <button onClick={() => handleOpen(item)} className="flex-1 min-w-0 text-left">
-                  <p className="text-sm text-white/80 truncate" title={item.title}>{item.title}</p>
+                  <p className="text-sm text-fg/80 truncate" title={item.title}>{item.title}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[11px] text-white/30 truncate">{item.appName}</span>
-                    <span className="text-[11px] text-white/20">·</span>
-                    <span className="text-[11px] text-white/25 truncate">{formatRelativeTime(item.ts)}</span>
+                    <span className="text-[11px] text-fg/30 truncate">{item.appName}</span>
+                    <span className="text-[11px] text-fg/20">·</span>
+                    <span className="text-[11px] text-fg/25 truncate">{formatRelativeTime(item.ts)}</span>
                   </div>
                 </button>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                  <button onClick={() => handleOpen(item)} title="Abrir" className="p-2 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition-colors">
+                  <button onClick={() => handleOpen(item)} title="Abrir" className="p-2 rounded-lg text-fg/30 hover:text-fg/70 hover:bg-overlay/[0.06] transition-colors">
                     <ExternalLink size={13} />
                   </button>
-                  <button onClick={() => handleRemove(item.id)} title="Quitar" className="p-2 rounded-lg text-white/30 hover:text-rose-400 hover:bg-rose-500/10 transition-colors">
+                  <button onClick={() => handleRemove(item.id)} title="Quitar" className="p-2 rounded-lg text-fg/30 hover:text-rose-400 hover:bg-rose-500/10 transition-colors">
                     <Trash2 size={13} />
                   </button>
                 </div>

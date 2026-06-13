@@ -4,7 +4,7 @@ import { useI18n }  from './I18nContext';
 
 const AppContext = createContext(null);
 
-const initialState = { apps: [], loading: false, error: null, openWindows: new Set(), badgeCounts: {} };
+const initialState = { apps: [], loading: false, error: null, openWindows: new Set(), badgeCounts: {}, problemAppIds: new Set() };
 
 function appReducer(state, action) {
   switch (action.type) {
@@ -33,6 +33,8 @@ function appReducer(state, action) {
     }
     case 'UPDATE_BADGE':
       return { ...state, badgeCounts: { ...state.badgeCounts, [action.appId]: action.count } };
+    case 'SET_PROBLEM_APPS':
+      return { ...state, problemAppIds: new Set(action.appIds) };
     default: return state;
   }
 }
@@ -48,6 +50,12 @@ export function AppProvider({ children }) {
   const [pinInput, setPinInput] = useState('');
 
   useEffect(() => { loadApps(); }, []);
+
+  useEffect(() => {
+    window.electronAPI?.getProblemApps?.()
+      .then(map => dispatch({ type: 'SET_PROBLEM_APPS', appIds: Object.keys(map || {}) }))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const unsub = window.electronAPI?.onAppWindowClosed?.((id) => {
@@ -173,6 +181,13 @@ export function AppProvider({ children }) {
     } catch (err) { toast.error(t('error'), err.message); }
   }, [toast, t]);
 
+  const toggleFavorite = useCallback(async (appId) => {
+    try {
+      const result = await window.electronAPI?.toggleFavorite(appId);
+      dispatch({ type: 'UPDATE_APP', id: appId, updates: { favorite: result?.favorite } });
+    } catch (err) { toast.error(t('error'), err.message); }
+  }, [toast, t]);
+
   const sortedApps = React.useMemo(() =>
     [...state.apps].sort((a, b) => {
       if (a.pinned && !b.pinned) return -1;
@@ -188,17 +203,17 @@ export function AppProvider({ children }) {
     <AppContext.Provider value={{
       apps: sortedApps, rawApps: state.apps, recentApps,
       loading: state.loading, error: state.error, openWindows: state.openWindows,
-      badgeCounts: state.badgeCounts,
-      installApp, uninstallApp, updateApp, launchApp, togglePin, loadApps,
+      badgeCounts: state.badgeCounts, problemAppIds: state.problemAppIds,
+      installApp, uninstallApp, updateApp, launchApp, togglePin, toggleFavorite, loadApps,
       isInstalled:  (catalogId) => state.apps.some(a => a.catalogId === catalogId),
       isWindowOpen: (appId)     => state.openWindows.has(appId),
     }}>
       {children}
       {pinDialog && (
         <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-sm glass rounded-2xl border border-white/[0.08] shadow-card-hover p-5">
-            <p className="text-base font-semibold text-white">App protegida</p>
-            <p className="text-sm text-white/40 mt-1">Introduce el PIN para abrir {pinDialog.appName}.</p>
+          <div className="w-full max-w-sm glass rounded-2xl border border-line/[0.08] shadow-card-hover p-5">
+            <p className="text-base font-semibold text-fg">App protegida</p>
+            <p className="text-sm text-fg/40 mt-1">Introduce el PIN para abrir {pinDialog.appName}.</p>
             <input
               autoFocus
               type="password"

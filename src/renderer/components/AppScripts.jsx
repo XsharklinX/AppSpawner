@@ -70,8 +70,8 @@ export default function AppScripts({ app }) {
       {/* Info */}
       <div className="flex items-start gap-3 glass rounded-xl p-3.5">
         <Info size={15} className="text-violet-400 mt-0.5 flex-shrink-0" />
-        <p className="text-xs text-white/40 leading-relaxed">
-          El CSS y JS se inyectan en <strong className="text-white/60">{app.name}</strong> después de cada carga de página.
+        <p className="text-xs text-fg/40 leading-relaxed">
+          El CSS y JS se inyectan en <strong className="text-fg/60">{app.name}</strong> después de cada carga de página.
           Úsalos para personalizar la interfaz o automatizar acciones.
         </p>
       </div>
@@ -80,16 +80,16 @@ export default function AppScripts({ app }) {
       <label className="flex items-center gap-3 cursor-pointer select-none glass rounded-xl px-4 py-3">
         <div
           onClick={() => setEnabled(v => !v)}
-          className={`relative w-9 h-5 rounded-full transition-colors ${enabled ? 'bg-violet-600' : 'bg-white/[0.1]'}`}
+          className={`relative w-9 h-5 rounded-full transition-colors ${enabled ? 'bg-violet-600' : 'bg-overlay/[0.1]'}`}
         >
           <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${enabled ? 'translate-x-4' : ''}`} />
         </div>
-        <span className="text-sm font-medium text-white/70">Scripts habilitados</span>
+        <span className="text-sm font-medium text-fg/70">Scripts habilitados</span>
       </label>
 
       {/* Tabs CSS / JS */}
       <div className="glass rounded-xl p-3">
-        <p className="text-[11px] font-semibold text-white/35 uppercase tracking-wider mb-2">Permisos del script</p>
+        <p className="text-[11px] font-semibold text-fg/35 uppercase tracking-wider mb-2">Permisos del script</p>
         <div className="grid grid-cols-2 gap-2">
           {[
             ['css', 'Inyectar CSS'],
@@ -103,7 +103,7 @@ export default function AppScripts({ app }) {
               className={`rounded-lg border px-3 py-2 text-left text-xs transition-all ${
                 permissions[key]
                   ? 'bg-violet-600/18 border-violet-500/35 text-violet-200'
-                  : 'bg-white/[0.025] border-white/[0.07] text-white/35 hover:text-white/60'
+                  : 'bg-overlay/[0.025] border-line/[0.07] text-fg/35 hover:text-fg/60'
               }`}
             >
               {label}
@@ -118,7 +118,7 @@ export default function AppScripts({ app }) {
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${tab === t ? 'bg-violet-600/30 text-violet-300' : 'text-white/35 hover:text-white/60'}`}
+            className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${tab === t ? 'bg-violet-600/30 text-violet-300' : 'text-fg/35 hover:text-fg/60'}`}
           >
             {t === 'css' ? '🎨 CSS' : '⚡ JavaScript'}
           </button>
@@ -154,7 +154,7 @@ export default function AppScripts({ app }) {
           className="btn-primary flex items-center gap-2 text-sm flex-1 justify-center"
         >
           {saving
-            ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            ? <div className="w-4 h-4 border-2 border-line/40 border-t-white rounded-full animate-spin" />
             : saved
               ? <CheckCircle2 size={14} />
               : <Save size={14} />
@@ -172,7 +172,7 @@ export default function AppScripts({ app }) {
         )}
       </div>
 
-      <p className="text-[11px] text-white/20 leading-relaxed">
+      <p className="text-[11px] text-fg/20 leading-relaxed">
         Los cambios se aplican en la siguiente carga de página. Recarga la app tras guardar.
       </p>
     </div>

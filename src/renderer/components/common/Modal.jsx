@@ -79,14 +79,14 @@ export default function Modal({
       >
         {/* Header */}
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-white/[0.06]">
+          <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-line/[0.06]">
             {title && (
-              <h2 className="text-base font-semibold text-white">{title}</h2>
+              <h2 className="text-base font-semibold text-fg">{title}</h2>
             )}
             {showCloseButton && (
               <button
                 onClick={onClose}
-                className="ml-auto text-white/30 hover:text-white/70 transition-colors rounded-lg p-1 hover:bg-white/[0.06]"
+                className="ml-auto text-fg/30 hover:text-fg/70 transition-colors rounded-lg p-1 hover:bg-overlay/[0.06]"
                 aria-label="Cerrar"
               >
                 <X size={16} />

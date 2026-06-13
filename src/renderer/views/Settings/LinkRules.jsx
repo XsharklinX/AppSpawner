@@ -39,8 +39,8 @@ export default function LinkRules() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h2 className="text-base font-semibold text-white mb-0.5">{t('set_link_rules')}</h2>
-        <p className="text-sm text-white/35 leading-relaxed max-w-md">{t('link_desc')}</p>
+        <h2 className="text-base font-semibold text-fg mb-0.5">{t('set_link_rules')}</h2>
+        <p className="text-sm text-fg/35 leading-relaxed max-w-md">{t('link_desc')}</p>
       </div>
 
       {/* ── Cómo funciona ────────────────────────────────────────────────── */}
@@ -49,8 +49,8 @@ export default function LinkRules() {
           <ShieldCheck size={17} className="text-violet-400" />
         </div>
         <div>
-          <p className="text-sm font-medium text-white/75 mb-1">¿Cómo funciona la intercepción?</p>
-          <ol className="text-xs text-white/35 leading-relaxed space-y-1 list-decimal list-inside">
+          <p className="text-sm font-medium text-fg/75 mb-1">¿Cómo funciona la intercepción?</p>
+          <ol className="text-xs text-fg/35 leading-relaxed space-y-1 list-decimal list-inside">
             <li>AppSpawner se registra como handler del protocolo <code className="text-violet-400 bg-violet-500/10 px-1 rounded">appspawner://</code></li>
             <li>Cuando haces clic en un link que coincide con tu app, el sistema lo redirige aquí</li>
             <li>Se abre la ventana SSB correspondiente en lugar del navegador</li>
@@ -78,7 +78,7 @@ export default function LinkRules() {
       {/* ── Apps que serían interceptadas ────────────────────────────────── */}
       {settings.interceptLinks && apps.length > 0 && (
         <div className="flex flex-col gap-2.5">
-          <h3 className="text-[11px] font-semibold text-white/35 uppercase tracking-wider">
+          <h3 className="text-[11px] font-semibold text-fg/35 uppercase tracking-wider">
             Dominios monitoreados ({apps.length})
           </h3>
           <div className="glass rounded-xl p-3 flex flex-col gap-1.5 max-h-40 overflow-y-auto scrollbar-thin">
@@ -88,7 +88,7 @@ export default function LinkRules() {
               return (
                 <div key={app.id} className="flex items-center gap-2.5 px-1 py-1">
                   <div className="w-2 h-2 rounded-full bg-emerald-400/60 flex-shrink-0" />
-                  <span className="text-xs text-white/55 flex-1">{app.name}</span>
+                  <span className="text-xs text-fg/55 flex-1">{app.name}</span>
                   <code className="text-[10px] text-violet-400/70 bg-violet-500/10 px-1.5 py-0.5 rounded">
                     {domain}
                   </code>
@@ -100,7 +100,7 @@ export default function LinkRules() {
       )}
 
       {/* Info pie */}
-      <div className="flex items-start gap-2 text-xs text-white/25 leading-relaxed">
+      <div className="flex items-start gap-2 text-xs text-fg/25 leading-relaxed">
         <ExternalLink size={12} className="mt-0.5 flex-shrink-0" />
         <p>
           La intercepción de links puede requerir permisos adicionales en algunos sistemas.

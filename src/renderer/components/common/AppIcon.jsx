@@ -34,7 +34,7 @@ export default function AppIcon({
   if (iconType === 'customImage' && iconValue) {
     return (
       <div
-        className={`flex items-center justify-center overflow-hidden bg-white/[0.06] ${className}`}
+        className={`flex items-center justify-center overflow-hidden bg-overlay/[0.06] ${className}`}
         style={containerStyle}
         title={name}
       >
@@ -52,7 +52,7 @@ export default function AppIcon({
   if (iconType === 'favicon' && faviconUrl && faviconOk) {
     return (
       <div
-        className={`flex items-center justify-center overflow-hidden bg-white/[0.06] ${className}`}
+        className={`flex items-center justify-center overflow-hidden bg-overlay/[0.06] ${className}`}
         style={containerStyle} title={name}
       >
         <img
@@ -69,7 +69,7 @@ export default function AppIcon({
   // ── Emoji ──────────────────────────────────────────────────────────────────
   if (iconType === 'emoji') {
     return (
-      <div className={`flex items-center justify-center select-none overflow-hidden bg-white/[0.06] ${className}`}
+      <div className={`flex items-center justify-center select-none overflow-hidden bg-overlay/[0.06] ${className}`}
         style={containerStyle} title={name}>
         <span style={{ fontSize: Math.round(size * 0.52), lineHeight: 1 }}>{iconValue}</span>
       </div>

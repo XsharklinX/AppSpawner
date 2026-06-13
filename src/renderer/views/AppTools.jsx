@@ -33,7 +33,7 @@ export default function AppTools({ app, initialSection = 'scripts', onBack }) {
       <div className="flex-shrink-0 px-7 pt-6 pb-4">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-sm text-white/35 hover:text-white/65 transition-colors mb-5"
+          className="flex items-center gap-2 text-sm text-fg/35 hover:text-fg/65 transition-colors mb-5"
         >
           <ArrowLeft size={15} /> Volver al Dashboard
         </button>
@@ -51,8 +51,8 @@ export default function AppTools({ app, initialSection = 'scripts', onBack }) {
       </div>
 
       {/* Cuerpo: sidebar + contenido */}
-      <div className="flex-1 flex overflow-hidden border-t border-white/[0.05]">
-        <aside className="w-52 flex-shrink-0 border-r border-white/[0.05] p-3 flex flex-col gap-0.5 pt-5">
+      <div className="flex-1 flex overflow-hidden border-t border-line/[0.05]">
+        <aside className="w-52 flex-shrink-0 border-r border-line/[0.05] p-3 flex flex-col gap-0.5 pt-5">
           {SECTIONS.map(s => {
             const Icon   = s.icon;
             const isActive = section === s.id;
@@ -65,11 +65,11 @@ export default function AppTools({ app, initialSection = 'scripts', onBack }) {
                   transition-all duration-150 text-left
                   ${isActive
                     ? 'bg-violet-600/20 text-violet-300 border border-violet-500/25'
-                    : 'text-white/45 hover:text-white/75 hover:bg-white/[0.04]'
+                    : 'text-fg/45 hover:text-fg/75 hover:bg-overlay/[0.04]'
                   }
                 `}
               >
-                <Icon size={15} className={isActive ? 'text-violet-400' : 'text-white/25'} />
+                <Icon size={15} className={isActive ? 'text-violet-400' : 'text-fg/25'} />
                 {s.label}
               </button>
             );

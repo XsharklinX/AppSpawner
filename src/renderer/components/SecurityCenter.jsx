@@ -78,8 +78,8 @@ function PasswordsTab({ app }) {
           {creds.map(c => (
             <div key={c.id} className="glass rounded-xl px-3.5 py-3 flex items-center gap-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white/80 truncate">{c.name}</p>
-                <p className="text-[11px] text-white/35 truncate">{c.username}</p>
+                <p className="text-sm font-medium text-fg/80 truncate">{c.name}</p>
+                <p className="text-[11px] text-fg/35 truncate">{c.username}</p>
               </div>
               <button
                 onClick={() => handleAutofill(c.id)}
@@ -87,7 +87,7 @@ function PasswordsTab({ app }) {
                 className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg border transition-all ${
                   isOpen
                     ? 'bg-violet-600/15 border-violet-500/20 text-violet-400 hover:bg-violet-600/25'
-                    : 'bg-white/[0.03] border-white/[0.06] text-white/20 cursor-default'
+                    : 'bg-overlay/[0.03] border-line/[0.06] text-fg/20 cursor-default'
                 }`}
                 title={isOpen ? 'Rellenar formulario' : 'Abre la app primero'}
               >
@@ -96,7 +96,7 @@ function PasswordsTab({ app }) {
                   : <Zap size={11} />}
                 Autofill
               </button>
-              <button onClick={() => handleDelete(c.id)} className="text-white/20 hover:text-red-400 transition-colors p-1">
+              <button onClick={() => handleDelete(c.id)} className="text-fg/20 hover:text-red-400 transition-colors p-1">
                 <Trash2 size={12} />
               </button>
             </div>
@@ -106,17 +106,17 @@ function PasswordsTab({ app }) {
 
       {adding ? (
         <div className="glass rounded-xl p-4 flex flex-col gap-3">
-          <p className="text-xs font-semibold text-white/35 uppercase tracking-wider">Nueva credencial</p>
+          <p className="text-xs font-semibold text-fg/35 uppercase tracking-wider">Nueva credencial</p>
           <input type="text" value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} placeholder="Nombre (ej: Trabajo)" className="input-field text-sm" />
           <input type="text" value={form.username} onChange={e => setForm(f => ({...f, username: e.target.value}))} placeholder="Usuario o email *" className="input-field text-sm" autoComplete="off" />
           <div className="relative">
             <input type={showPwd ? 'text' : 'password'} value={form.password} onChange={e => setForm(f => ({...f, password: e.target.value}))} onKeyDown={e => e.key === 'Enter' && handleAdd()} placeholder="Contraseña *" className="input-field text-sm pr-10" autoComplete="new-password" />
-            <button onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
+            <button onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg/30 hover:text-fg/60">
               {showPwd ? <EyeOff size={13} /> : <Eye size={13} />}
             </button>
           </div>
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 flex flex-col gap-2">
-            <p className="text-[11px] text-white/35 font-semibold uppercase tracking-wider">Selectors avanzados opcionales</p>
+          <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.025] p-3 flex flex-col gap-2">
+            <p className="text-[11px] text-fg/35 font-semibold uppercase tracking-wider">Selectors avanzados opcionales</p>
             <input
               type="text"
               value={form.selectors.username}
@@ -240,30 +240,30 @@ function OTPTab({ app }) {
               <div key={e.id} className="glass rounded-xl p-3.5 flex items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <p className="text-sm font-medium text-white/80">{e.name}</p>
-                    {e.issuer && <span className="text-[10px] text-white/30">{e.issuer}</span>}
+                    <p className="text-sm font-medium text-fg/80">{e.name}</p>
+                    {e.issuer && <span className="text-[10px] text-fg/30">{e.issuer}</span>}
                   </div>
                   {/* Code display */}
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xl font-bold tracking-[0.2em] text-violet-400">
                       {code.slice(0,3)} {code.slice(3)}
                     </span>
-                    <button onClick={() => copyCode(code)} className="text-white/25 hover:text-violet-400 transition-colors p-1" title="Copiar">
+                    <button onClick={() => copyCode(code)} className="text-fg/25 hover:text-violet-400 transition-colors p-1" title="Copiar">
                       <Copy size={13} />
                     </button>
                   </div>
                   {/* Progress bar */}
-                  <div className="mt-2 h-1 rounded-full bg-white/[0.07] overflow-hidden w-full">
+                  <div className="mt-2 h-1 rounded-full bg-overlay/[0.07] overflow-hidden w-full">
                     <div
                       className={`h-full rounded-full transition-all duration-1000 ${rem <= 5 ? 'bg-red-500' : rem <= 10 ? 'bg-amber-500' : 'bg-violet-500'}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <p className={`text-[10px] mt-0.5 ${rem <= 5 ? 'text-red-400' : 'text-white/25'}`}>
+                  <p className={`text-[10px] mt-0.5 ${rem <= 5 ? 'text-red-400' : 'text-fg/25'}`}>
                     Expira en {rem}s
                   </p>
                 </div>
-                <button onClick={() => handleDelete(e.id)} className="text-white/20 hover:text-red-400 transition-colors p-1 flex-shrink-0">
+                <button onClick={() => handleDelete(e.id)} className="text-fg/20 hover:text-red-400 transition-colors p-1 flex-shrink-0">
                   <Trash2 size={12} />
                 </button>
               </div>
@@ -274,7 +274,7 @@ function OTPTab({ app }) {
 
       {adding ? (
         <div className="glass rounded-xl p-4 flex flex-col gap-3">
-          <p className="text-xs font-semibold text-white/35 uppercase tracking-wider">Añadir 2FA (TOTP)</p>
+          <p className="text-xs font-semibold text-fg/35 uppercase tracking-wider">Añadir 2FA (TOTP)</p>
           <input type="text" value={form.name} onChange={e => setForm(f=>({...f,name:e.target.value}))} placeholder="Nombre (ej: Cuenta principal)" className="input-field text-sm" />
           <input type="text" value={form.issuer} onChange={e => setForm(f=>({...f,issuer:e.target.value}))} placeholder="Emisor (ej: Google, GitHub…)" className="input-field text-sm" />
           <div>
@@ -286,7 +286,7 @@ function OTPTab({ app }) {
               className="input-field text-sm font-mono tracking-wider"
               autoComplete="off"
             />
-            <p className="text-[11px] text-white/25 mt-1 leading-relaxed">
+            <p className="text-[11px] text-fg/25 mt-1 leading-relaxed">
               Puedes pegar el secreto Base32 o la URL otpauth:// que contiene un QR 2FA exportado por otro gestor.
             </p>
           </div>
@@ -360,14 +360,14 @@ function ImportTab({ app }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="glass rounded-xl p-4 flex flex-col gap-3">
-        <p className="text-xs text-white/40 leading-relaxed">
+        <p className="text-xs text-fg/40 leading-relaxed">
           Importa contraseñas desde Chrome, Firefox, Edge o cualquier gestor (Bitwarden, 1Password, etc.)
-          exportando a <strong className="text-white/60">CSV</strong>.
+          exportando a <strong className="text-fg/60">CSV</strong>.
         </p>
-        <div className="flex flex-col gap-1 text-[11px] text-white/30">
-          <p>• <strong className="text-white/50">Chrome/Edge:</strong> chrome://settings/passwords → Exportar contraseñas</p>
-          <p>• <strong className="text-white/50">Firefox:</strong> about:logins → ⋯ → Exportar contraseñas</p>
-          <p>• <strong className="text-white/50">Bitwarden:</strong> Vault → Herramientas → Exportar</p>
+        <div className="flex flex-col gap-1 text-[11px] text-fg/30">
+          <p>• <strong className="text-fg/50">Chrome/Edge:</strong> chrome://settings/passwords → Exportar contraseñas</p>
+          <p>• <strong className="text-fg/50">Firefox:</strong> about:logins → ⋯ → Exportar contraseñas</p>
+          <p>• <strong className="text-fg/50">Bitwarden:</strong> Vault → Herramientas → Exportar</p>
         </div>
         <button onClick={() => fileRef.current?.click()} className="btn-primary flex items-center gap-2 text-sm w-fit">
           <Upload size={13} /> Seleccionar archivo CSV
@@ -383,13 +383,13 @@ function ImportTab({ app }) {
 
       {parsed && parsed.count > 0 && (
         <div className="flex flex-col gap-3">
-          <p className="text-xs text-white/40">{parsed.count} entradas encontradas. Asigna cada una a una app:</p>
+          <p className="text-xs text-fg/40">{parsed.count} entradas encontradas. Asigna cada una a una app:</p>
           <div className="max-h-56 overflow-y-auto scrollbar-thin flex flex-col gap-2">
             {parsed.entries.map((entry, idx) => (
               <div key={idx} className="glass rounded-xl px-3 py-2.5 flex items-center gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-white/70 truncate">{entry.username}</p>
-                  <p className="text-[10px] text-white/30 truncate">{entry.url}</p>
+                  <p className="text-xs font-medium text-fg/70 truncate">{entry.username}</p>
+                  <p className="text-[10px] text-fg/30 truncate">{entry.url}</p>
                 </div>
                 <select
                   value={selected[idx] || ''}
@@ -407,7 +407,7 @@ function ImportTab({ app }) {
             disabled={saving || !Object.values(selected).some(Boolean)}
             className="btn-primary flex items-center gap-2 text-sm disabled:opacity-40"
           >
-            {saving ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <Save size={13} />}
+            {saving ? <div className="w-4 h-4 border-2 border-line/40 border-t-white rounded-full animate-spin" /> : <Save size={13} />}
             Guardar {Object.values(selected).filter(Boolean).length} seleccionadas
           </button>
         </div>
@@ -436,7 +436,7 @@ export default function SecurityCenter({ app }) {
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
-              tab === t.id ? 'bg-violet-600/30 text-violet-300' : 'text-white/35 hover:text-white/60'
+              tab === t.id ? 'bg-violet-600/30 text-violet-300' : 'text-fg/35 hover:text-fg/60'
             }`}
           >
             {t.label}

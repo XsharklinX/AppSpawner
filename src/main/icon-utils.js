@@ -361,13 +361,18 @@ function icoFromPngVariants(variants) {
   return Buffer.concat([header, ...variants.map(item => item.png)]);
 }
 
-async function ensureAppIcon(appConfig) {
+async function ensureAppIcon(appConfig, { force = false } = {}) {
   const dir = appIconDir();
   const base = `${safeFileName(appConfig.name)}-${appConfig.id}-${iconFingerprint(appConfig)}`;
   const pngPath = path.join(dir, `${base}.png`);
   const icoPath = path.join(dir, `${base}.ico`);
 
-  if (fs.existsSync(pngPath) && fs.existsSync(icoPath)) {
+  if (force) {
+    try { fs.unlinkSync(pngPath); } catch {}
+    try { fs.unlinkSync(icoPath); } catch {}
+  }
+
+  if (!force && fs.existsSync(pngPath) && fs.existsSync(icoPath)) {
     return { png: pngPath, ico: icoPath, fingerprint: iconFingerprint(appConfig) };
   }
 

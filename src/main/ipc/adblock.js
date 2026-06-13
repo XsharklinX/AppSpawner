@@ -4,7 +4,8 @@ const fs   = require('fs');
 const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
-const { app: electronApp } = require('electron');
+const { app: electronApp, session: electronSession } = require('electron');
+const { getRecommendedRules } = require('../blocklists/recommended-rules');
 
 // ── Blocklist ─────────────────────────────────────────────────────────────────
 
@@ -12,6 +13,8 @@ let blockSet = new Set();
 let abpState = {
   networkRules: [],
   exceptionRules: [],
+  networkIndex: { byDomain: new Map(), generic: [] },
+  exceptionIndex: { byDomain: new Map(), generic: [] },
   globalCosmetic: [],
   domainCosmetic: new Map(),
   cosmeticExceptions: new Map(),
@@ -177,7 +180,7 @@ function isBlockedDomain(urlStr) {
       if (blockSet.has(parts.slice(i).join('.'))) return true;
     }
     // Comprueba también ABP network rules para navigations
-    if (matchesAnyAbpRule(urlStr, abpState.networkRules, {})) return true;
+    if (findIndexedRule(urlStr, abpState.networkIndex, {})) return true;
     return AD_NAVIGATION_PATTERNS.some(p => p.test(urlStr));
   } catch { return false; }
 }
@@ -218,6 +221,14 @@ function clearBlockLog(appId) {
   blockLog.set(appId, []);
 }
 
+// Registra un popup/redirect bloqueado (window.open/will-navigate hacia un dominio
+// de anuncios) para que sea visible en el inspector y en las estadisticas de la app.
+function recordBlockedNavigation(appId, url, kind = 'popup') {
+  const reason = kind === 'redirect' ? 'Redirect bloqueado' : 'Popup bloqueado';
+  logBlock(appId, url, kind, reason);
+  incrementBlocked(appId);
+}
+
 // ── Player whitelist ──────────────────────────────────────────────────────────
 
 function isPlayerWhitelisted(hostname) {
@@ -239,9 +250,9 @@ function isBlocked(urlStr, customRules = [], { aggressive = false, resourceType 
     const hostname = parsed.hostname.toLowerCase().replace(/^www\./, '');
 
     if (isPlayerWhitelisted(hostname)) return null;
-    if (matchesAnyAbpRule(urlStr, abpState.exceptionRules, { resourceType, referrer })) return null;
+    if (findIndexedRule(urlStr, abpState.exceptionIndex, { resourceType, referrer })) return null;
 
-    const netRule = findMatchingAbpRule(urlStr, abpState.networkRules, { resourceType, referrer });
+    const netRule = findIndexedRule(urlStr, abpState.networkIndex, { resourceType, referrer });
     if (netRule) return `ABP: ${netRule.raw || netRule.domain || netRule.token || 'rule'}`;
 
     if (blockSet.has(hostname)) return `Dominio: ${hostname}`;
@@ -269,13 +280,6 @@ function isBlocked(urlStr, customRules = [], { aggressive = false, resourceType 
   } catch {
     return null;
   }
-}
-
-function findMatchingAbpRule(urlStr, rules, details) {
-  for (const rule of rules) {
-    if (matchesAbpRule(urlStr, rule, details)) return rule;
-  }
-  return null;
 }
 
 function getDefaultSubscriptions() {
@@ -354,15 +358,17 @@ function loadCachedSubscriptions(settings = {}) {
       subscription.error = err.message;
     }
   }
+  nextState.networkIndex = buildRuleIndex(nextState.networkRules);
+  nextState.exceptionIndex = buildRuleIndex(nextState.exceptionRules);
   abpState = nextState;
   abpState.loadedAt = Date.now();
   return getAdBlockStats();
 }
 
 async function updateSubscriptions(store, overrides = {}) {
-  const data = store.read();
+  const initialData = store.read();
   const subscriptions = normalizeSubscriptions({
-    ...data.settings,
+    ...initialData.settings,
     ...(Array.isArray(overrides.subscriptions) && { adblockSubscriptions: overrides.subscriptions }),
   });
   const nextState = createEmptyAbpState(subscriptions);
@@ -391,8 +397,14 @@ async function updateSubscriptions(store, overrides = {}) {
     }
   }
 
+  // Releer el store antes de escribir: las descargas de listas pueden tardar
+  // varios segundos por suscripción y no queremos pisar cambios (settings,
+  // apps, etc.) hechos por el usuario mientras tanto.
+  const data = store.read();
   data.settings = { ...data.settings, adblockSubscriptions: subscriptions, adblockLastAutoUpdate: new Date().toISOString() };
   store.write(data);
+  nextState.networkIndex = buildRuleIndex(nextState.networkRules);
+  nextState.exceptionIndex = buildRuleIndex(nextState.exceptionRules);
   abpState = nextState;
   abpState.loadedAt = Date.now();
   return { subscriptions, stats: getAdBlockStats() };
@@ -402,12 +414,58 @@ function createEmptyAbpState(subscriptions) {
   return {
     networkRules: [],
     exceptionRules: [],
+    networkIndex: { byDomain: new Map(), generic: [] },
+    exceptionIndex: { byDomain: new Map(), generic: [] },
     globalCosmetic: [],
     domainCosmetic: new Map(),
     cosmeticExceptions: new Map(),
     subscriptions,
     loadedAt: null,
   };
+}
+
+/**
+ * Indexa reglas 'domain' por dominio para evitar el escaneo lineal de
+ * abpState.networkRules/exceptionRules (que puede superar 100k reglas
+ * con varias suscripciones activas) en cada petición de red.
+ */
+function buildRuleIndex(rules) {
+  const byDomain = new Map();
+  const generic = [];
+  for (const rule of rules) {
+    if (rule.kind === 'domain' && rule.domain) {
+      const key = rule.domain.replace(/^www\./, '');
+      const bucket = byDomain.get(key);
+      if (bucket) bucket.push(rule);
+      else byDomain.set(key, [rule]);
+    } else {
+      generic.push(rule);
+    }
+  }
+  return { byDomain, generic };
+}
+
+// Busca una regla que matchee urlStr probando solo los buckets de dominio
+// (hostname y sus dominios padre) más las reglas genéricas tipo 'url'.
+function findIndexedRule(urlStr, index, details) {
+  if (!index) return null;
+  try {
+    const hostname = new URL(urlStr).hostname.toLowerCase().replace(/^www\./, '');
+    const labels = hostname.split('.');
+    for (let i = 0; i < labels.length; i++) {
+      const bucket = index.byDomain.get(labels.slice(i).join('.'));
+      if (!bucket) continue;
+      for (const rule of bucket) {
+        if (matchesAbpRule(urlStr, rule, details)) return rule;
+      }
+    }
+    for (const rule of index.generic) {
+      if (matchesAbpRule(urlStr, rule, details)) return rule;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function mergeAbpState(target, parsed) {
@@ -954,6 +1012,43 @@ function applyAdBlockToSession(session, appId, {
   } catch {}
 }
 
+/**
+ * Calcula las opciones de applyAdBlockToSession para una app a partir de su
+ * config y de los settings globales. Punto único de verdad para combinar los
+ * flags globales (adblockEnabled/Aggressive/Annoyances) con los overrides por
+ * app (adblockEnabled, adblockAggressiveOverride, adblockFilterCategories...).
+ */
+function buildAdBlockConfig(appConfig, settings = {}, { onPermissionRequest = null } = {}) {
+  const globalEnabled    = settings.adblockEnabled    ?? true;
+  const globalAggressive = settings.adblockAggressive ?? true;
+  const globalAnnoyances = settings.adblockAnnoyances ?? true;
+  const appEnabled         = appConfig.adblockEnabled         ?? true;
+  const aggressiveOverride = appConfig.adblockAggressiveOverride ?? null;
+  const effectiveAggressive = aggressiveOverride !== null && aggressiveOverride !== undefined
+    ? aggressiveOverride
+    : globalAggressive;
+
+  return {
+    enabled: globalEnabled && appEnabled,
+    customRules: appConfig.adblockCustomRules ?? [],
+    aggressive: effectiveAggressive,
+    annoyances: globalAnnoyances,
+    filterCategories: appConfig.adblockFilterCategories ?? null,
+    notificationsAllowed: appConfig.notificationsEnabled === true,
+    onPermissionRequest,
+  };
+}
+
+/**
+ * Aplica el adblock a la sesión persistida de una app, usando buildAdBlockConfig.
+ * Devuelve la session usada (por si el caller necesita reusarla).
+ */
+function applyAdBlockForApp(appId, appConfig, settings, { onPermissionRequest = null, overrides = {} } = {}) {
+  const sess = electronSession.fromPartition(`persist:app_${appId}`);
+  applyAdBlockToSession(sess, appId, { ...buildAdBlockConfig(appConfig, settings, { onPermissionRequest }), ...overrides });
+  return sess;
+}
+
 // ── IPC handlers ─────────────────────────────────────────────────────────────
 
 function registerAdBlockHandlers(ipcMain, store) {
@@ -1031,6 +1126,8 @@ function registerAdBlockHandlers(ipcMain, store) {
       cosmeticRules:     app?.adblockCosmeticRules      ?? [],
       filterCategories:  app?.adblockFilterCategories   ?? null,
       aggressiveOverride: app?.adblockAggressiveOverride ?? null,
+      overlayMode:       app?.adblockOverlayMode        ?? 'normal',
+      profile:           app?.adblockProfile            ?? null,
       blocked:           getBlockedCount(appId),
     };
   });
@@ -1044,6 +1141,8 @@ function registerAdBlockHandlers(ipcMain, store) {
     if (updates.cosmeticRules      !== undefined) data.apps[index].adblockCosmeticRules     = updates.cosmeticRules;
     if (updates.filterCategories   !== undefined) data.apps[index].adblockFilterCategories  = updates.filterCategories;
     if (updates.aggressiveOverride !== undefined) data.apps[index].adblockAggressiveOverride = updates.aggressiveOverride;
+    if (updates.overlayMode        !== undefined) data.apps[index].adblockOverlayMode       = updates.overlayMode;
+    if (updates.profile            !== undefined) data.apps[index].adblockProfile           = updates.profile;
     store.write(data);
     return { success: true };
   });
@@ -1089,6 +1188,36 @@ function registerAdBlockHandlers(ipcMain, store) {
     };
   });
 
+  // Lista local de reglas recomendadas (mantenida por AppSpawner)
+  ipcMain.handle('adblock:get-recommended-rules', (_e, appId) => {
+    const { apps } = store.read();
+    const app = apps.find(a => a.id === appId);
+    const applied = new Set(app?.adblockCosmeticRules || []);
+    const profile = app?.adblockProfile || null;
+    return getRecommendedRules().map(rule => ({
+      ...rule,
+      relevant: rule.category === 'generic' || rule.category === profile,
+      applied: rule.selectors.every(sel => applied.has(`##${sel}`)),
+    }));
+  });
+
+  ipcMain.handle('adblock:apply-recommended-rule', (_e, appId, ruleId, apply = true) => {
+    const rule = getRecommendedRules().find(r => r.id === ruleId);
+    if (!rule) return { success: false };
+    const data  = store.read();
+    const index = data.apps.findIndex(a => a.id === appId);
+    if (index === -1) return { success: false };
+    const existing = new Set(data.apps[index].adblockCosmeticRules || []);
+    for (const sel of rule.selectors) {
+      const cosmeticRule = `##${sel}`;
+      if (apply) existing.add(cosmeticRule);
+      else existing.delete(cosmeticRule);
+    }
+    data.apps[index].adblockCosmeticRules = [...existing];
+    store.write(data);
+    return { success: true, cosmeticRules: data.apps[index].adblockCosmeticRules };
+  });
+
   // Añadir regla cosmetica (elemento picker)
   ipcMain.handle('adblock:add-cosmetic-rule', (_e, appId, domain, selector) => {
     if (!isSafeCssSelector(selector)) return { success: false, error: 'Selector invalido' };
@@ -1103,11 +1232,81 @@ function registerAdBlockHandlers(ipcMain, store) {
     }
     return { success: true, rule };
   });
+
+  // Export/import global: reglas de todas las apps + suscripciones + config general
+  ipcMain.handle('adblock:export-all', () => {
+    const data = store.read();
+    const apps = (data.apps || []).map(a => ({
+      id: a.id,
+      name: a.name,
+      adblockEnabled:            a.adblockEnabled            ?? true,
+      adblockCustomRules:        a.adblockCustomRules        || [],
+      adblockCosmeticRules:      a.adblockCosmeticRules      || [],
+      adblockFilterCategories:   a.adblockFilterCategories   ?? null,
+      adblockAggressiveOverride: a.adblockAggressiveOverride ?? null,
+      adblockOverlayMode:        a.adblockOverlayMode        ?? 'normal',
+      adblockProfile:            a.adblockProfile            ?? null,
+    }));
+    return JSON.stringify({
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      settings: {
+        adblockEnabled:       data.settings?.adblockEnabled       ?? true,
+        adblockCosmetic:      data.settings?.adblockCosmetic      ?? true,
+        adblockHttpsUpgrade:  data.settings?.adblockHttpsUpgrade  ?? true,
+        adblockAggressive:    data.settings?.adblockAggressive    ?? true,
+        adblockAnnoyances:    data.settings?.adblockAnnoyances    ?? true,
+        adblockSubscriptions: normalizeSubscriptions(data.settings),
+      },
+      apps,
+    }, null, 2);
+  });
+
+  ipcMain.handle('adblock:import-all', (_e, jsonText) => {
+    let parsed;
+    try { parsed = JSON.parse(jsonText); } catch { return { success: false, error: 'JSON invalido' }; }
+    const data = store.read();
+    if (parsed.settings) {
+      data.settings = {
+        ...data.settings,
+        ...(parsed.settings.adblockEnabled      !== undefined && { adblockEnabled:      parsed.settings.adblockEnabled }),
+        ...(parsed.settings.adblockCosmetic     !== undefined && { adblockCosmetic:     parsed.settings.adblockCosmetic }),
+        ...(parsed.settings.adblockHttpsUpgrade !== undefined && { adblockHttpsUpgrade: parsed.settings.adblockHttpsUpgrade }),
+        ...(parsed.settings.adblockAggressive   !== undefined && { adblockAggressive:   parsed.settings.adblockAggressive }),
+        ...(parsed.settings.adblockAnnoyances   !== undefined && { adblockAnnoyances:   parsed.settings.adblockAnnoyances }),
+        ...(Array.isArray(parsed.settings.adblockSubscriptions) && {
+          adblockSubscriptions: normalizeSubscriptions({ adblockSubscriptions: parsed.settings.adblockSubscriptions }),
+        }),
+      };
+    }
+    let appsMatched = 0;
+    if (Array.isArray(parsed.apps)) {
+      for (const incoming of parsed.apps) {
+        const index = data.apps.findIndex(a => a.id === incoming.id);
+        if (index === -1) continue;
+        appsMatched++;
+        if (incoming.adblockEnabled            !== undefined) data.apps[index].adblockEnabled            = incoming.adblockEnabled;
+        if (incoming.adblockCustomRules        !== undefined) data.apps[index].adblockCustomRules        = incoming.adblockCustomRules;
+        if (incoming.adblockCosmeticRules      !== undefined) data.apps[index].adblockCosmeticRules      = incoming.adblockCosmeticRules;
+        if (incoming.adblockFilterCategories   !== undefined) data.apps[index].adblockFilterCategories   = incoming.adblockFilterCategories;
+        if (incoming.adblockAggressiveOverride !== undefined) data.apps[index].adblockAggressiveOverride = incoming.adblockAggressiveOverride;
+        if (incoming.adblockOverlayMode        !== undefined) data.apps[index].adblockOverlayMode        = incoming.adblockOverlayMode;
+        if (incoming.adblockProfile            !== undefined) data.apps[index].adblockProfile            = incoming.adblockProfile;
+      }
+    }
+    store.write(data);
+    if (Array.isArray(parsed.settings?.adblockSubscriptions)) {
+      loadCachedSubscriptions(data.settings);
+    }
+    return { success: true, appsMatched, stats: getAdBlockStats() };
+  });
 }
 
 module.exports = {
   registerAdBlockHandlers,
   applyAdBlockToSession,
+  buildAdBlockConfig,
+  applyAdBlockForApp,
   loadBlockList,
   isBlockedDomain,
   COSMETIC_CSS,
@@ -1117,4 +1316,14 @@ module.exports = {
   getBlockedCount,
   logCosmeticBlock,
   isSafeCssSelector,
+  recordBlockedNavigation,
+  // Exportado para tests del motor de reglas (puro, sin dependencias de Electron)
+  isBlocked,
+  parseAbpList,
+  compileNetworkRule,
+  parseRuleOptions,
+  matchesAbpRule,
+  matchesAnyAbpRule,
+  isThirdParty,
+  normalizeUrlToken,
 };

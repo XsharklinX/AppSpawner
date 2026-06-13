@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   launchApp:    (id, options)       => invoke('apps:launch', id, options),
   updateApp:    (id, updates)       => invoke('apps:update', id, updates),
   togglePin:    (id)                => invoke('apps:toggle-pin', id),
+  toggleFavorite: (id)              => invoke('apps:toggle-favorite', id),
+  refreshAppIcons: (appIds)         => invoke('apps:refresh-icons', appIds),
 
   // ── SETTINGS ──────────────────────────────────────────────────────────────
   getSettings:    ()      => invoke('settings:get'),
@@ -56,6 +58,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ── DIAGNOSTICO POR APP ───────────────────────────────────────────────────
   getAppDiagnostics:    (appId) => invoke('diagnostics:get-app', appId),
   clearDiagnosticErrors: (appId) => invoke('diagnostics:clear-errors', appId),
+  getProblemApps:       ()      => invoke('diagnostics:get-problem-apps'),
 
   // ── TRAY ──────────────────────────────────────────────────────────────────
   refreshTray: () => send('tray:refresh'),
@@ -162,6 +165,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteScripts: (appId)          => invoke('scripts:delete', appId),
 
   // ── CREDENTIALS ───────────────────────────────────────────────────────────
+  getEncryptionStatus:  ()                 => invoke('credentials:encryption-status'),
   listCredentials:      (appId)           => invoke('credentials:list',            appId),
   getCredentials:       (appId)           => invoke('credentials:get',             appId),
   addCredential:        (appId, cred)     => invoke('credentials:add',             appId, cred),
@@ -210,6 +214,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   importAdBlockRules:         (appId, text)     => invoke('adblock:import-rules', appId, text),
   addAdBlockCosmeticRule:     (appId, dom, sel) => invoke('adblock:add-cosmetic-rule', appId, dom, sel),
   startAdBlockElementPicker:  (appId)           => invoke('adblock:start-element-picker', appId),
+  getRecommendedAdBlockRules: (appId)               => invoke('adblock:get-recommended-rules', appId),
+  applyRecommendedAdBlockRule:(appId, ruleId, apply) => invoke('adblock:apply-recommended-rule', appId, ruleId, apply),
+  exportAllAdBlockRules:      ()                     => invoke('adblock:export-all'),
+  importAllAdBlockRules:      (text)                 => invoke('adblock:import-all', text),
 
   // ── MÉTRICAS DE USO ───────────────────────────────────────────────────────
   recordAppTime: (appId, ms) => invoke('app:record-time', appId, ms),

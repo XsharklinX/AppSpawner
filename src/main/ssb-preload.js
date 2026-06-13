@@ -27,8 +27,6 @@ function forceOpenShadowDom() {
     });
   } catch {}
 }
-forceOpenShadowDom();
-
 // Cuando el usuario habilita notificaciones para esta app, Electron ya muestra
 // las Notification del navegador como notificaciones nativas del SO — sólo
 // hace falta enganchar el clic para enfocar/restaurar la ventana de la app.
@@ -70,6 +68,7 @@ const DEFAULT_CONFIG = {
     enabled: true,
     annoyances: true,
     cosmetic: true,
+    overlayMode: 'normal', // 'soft' | 'normal' | 'aggressive'
   },
   toolbar: {
     enabled: false,
@@ -110,6 +109,12 @@ function readConfig() {
 }
 
 const config = readConfig();
+
+// Solo se activa si esta app tiene el escaneo de molestias habilitado: forzar
+// shadow DOM "open" en TODOS los frames (incluidos iframes de terceros como
+// Stripe/PayPal) puede romper widgets que dependen de shadow roots cerrados.
+// El toggle de adblock/annoyances por app sirve como opt-out para apps sensibles.
+if (config.adblock?.enabled && config.adblock?.annoyances) forceOpenShadowDom();
 
 // Con nodeIntegrationInSubFrames activo, este preload se ejecuta también dentro de
 // los iframes (incluidos los reproductores de video de terceros, donde suelen vivir
@@ -215,6 +220,7 @@ function toolbarButton(key) {
     shield:   ['M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10',    'Ad Block activo'],
     picker:   ['M4 20h4l10.5-10.5a2 2 0 0 0-4-4L4 16v4',        'Ocultar elemento'],
     snapshot: ['M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', 'Guardar sesión'],
+    broken:   ['M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01', 'Esta página se rompió (pausar AdBlock y recargar)'],
     settings: ['M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z', 'Opciones de toolbar'],
   };
   const [pathData, label] = labels[key] || ['', key];
@@ -238,6 +244,10 @@ function toolbarButton(key) {
     if (key === 'picker')   startElementPicker();
     if (key === 'snapshot') ipcRenderer.send('ssb:save-snapshot');
     if (key === 'settings') openToolbarEditor();
+    if (key === 'broken') {
+      ipcRenderer.send('ssb:report-broken-page');
+      showSsbToast('AdBlock pausado para esta app. Recargando…', 'ok');
+    }
   });
   return button;
 }
@@ -253,8 +263,8 @@ function showSsbToast(message, type) {
   }
   const t = document.createElement('div');
   t.dataset.appspawnerUi = 'true';
-  const col = type === 'error' ? '#ef4444' : '#10b981';
-  const icon = type === 'error' ? '✗' : '✓';
+  const col  = type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#10b981';
+  const icon = type === 'error' ? '✗' : type === 'warning' ? '⚠' : '✓';
   t.style.cssText = `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:2147483647;background:rgba(12,12,18,.97);color:#fff;padding:10px 18px;border-radius:12px;font:13px system-ui;border:1px solid ${col}55;box-shadow:0 8px 28px rgba(0,0,0,.45);backdrop-filter:blur(16px);display:flex;align-items:center;gap:9px;white-space:nowrap;animation:as-toast-in .18s ease`;
   t.innerHTML = `<span style="color:${col};font-size:15px">${icon}</span>${message}`;
   document.body.appendChild(t);
@@ -274,6 +284,7 @@ const ALL_TOOLBAR_BUTTONS = [
   { key: 'shield',   label: 'AdBlock',  icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10' },
   { key: 'picker',   label: 'Ocultar',  icon: 'M4 20h4l10.5-10.5a2 2 0 0 0-4-4L4 16v4' },
   { key: 'snapshot', label: 'Sesión',   icon: 'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
+  { key: 'broken',   label: 'Reportar', icon: 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01' },
 ];
 
 function rebuildToolbar(newButtons) {
@@ -534,6 +545,11 @@ ipcRenderer.on('ssb:snapshot-saved', (_e, { name } = {}) => {
   showSsbToast(`Sesión guardada${name ? ': ' + name : ''}`, 'success');
 });
 
+// Aviso visible cuando el proceso principal bloquea un popup/redirect de anuncios
+ipcRenderer.on('ssb:show-toast', (_e, { message, type } = {}) => {
+  if (message) showSsbToast(message, type || 'warning');
+});
+
 function injectToolbar() {
   if (!config.toolbar?.enabled || document.getElementById('appspawner-toolbar')) return;
 
@@ -714,12 +730,28 @@ function hasCloseControl(node) {
   return Boolean(node.querySelector('button, [role="button"], [aria-label*="close" i], [aria-label*="cerrar" i], [class*="close" i], [id*="close" i]'));
 }
 
+// Umbral minimo de z-index para considerar un elemento "overlay flotante",
+// segun el modo anti-overlays configurado por sitio:
+//  - soft:       solo los casos mas evidentes (z-index muy alto)
+//  - normal:     comportamiento por defecto
+//  - aggressive: detecta tambien overlays con z-index bajo (mas falsos positivos posibles)
+function getOverlayMode() {
+  return config.adblock?.overlayMode || 'normal';
+}
+
+function floatingOverlayZThreshold() {
+  const mode = getOverlayMode();
+  if (mode === 'soft') return 5000;
+  if (mode === 'aggressive') return 50;
+  return 1000;
+}
+
 function isFloatingOverlay(node) {
   if (!(node instanceof Element) || isInsideMediaSurface(node)) return false;
   const style = getComputedStyle(node);
   if (!['fixed', 'sticky', 'absolute'].includes(style.position)) return false;
   const z = Number.parseInt(style.zIndex, 10);
-  if (!Number.isFinite(z) || z < 1000) return false;
+  if (!Number.isFinite(z) || z < floatingOverlayZThreshold()) return false;
   const rect = node.getBoundingClientRect();
   if (rect.width < 80 || rect.height < 40) return false;
   if (rect.width > window.innerWidth * 0.95 && rect.height > window.innerHeight * 0.8) return false;
@@ -745,18 +777,26 @@ function isTopCornerNotification(node) {
   if (!(node instanceof Element) || isAppSpawnerUi(node) || isInsideMediaSurface(node)) return false;
   const style = getComputedStyle(node);
   if (!['fixed', 'absolute'].includes(style.position)) return false;
+  const mode = getOverlayMode();
   const rect = node.getBoundingClientRect();
-  if (rect.width < 140 || rect.width > 460) return false;
-  if (rect.height < 48 || rect.height > 220) return false;
-  if (rect.top < 0 || rect.top > 420) return false;
+  const widthMax  = mode === 'aggressive' ? 600 : 460;
+  const heightMax = mode === 'aggressive' ? 320 : 220;
+  const topMax    = mode === 'aggressive' ? 600 : 420;
+  if (rect.width < 140 || rect.width > widthMax) return false;
+  if (rect.height < 48 || rect.height > heightMax) return false;
+  if (rect.top < 0 || rect.top > topMax) return false;
   // Debe estar en un lateral (>50% del ancho desde algún borde)
   const nearRight = rect.right > window.innerWidth * 0.5;
   const nearLeft  = rect.left  < window.innerWidth * 0.5;
   if (!nearRight && !nearLeft) return false;
   const text = elementText(node);
   if (!text || text.length > 600) return false;
+  const termHit = FAKE_NOTIFICATION_TERMS.some(t => text.includes(t));
+  // En modo "soft" solo actuamos ante coincidencias claras de texto de notificacion falsa,
+  // para minimizar falsos positivos en sitios productivos.
+  if (mode === 'soft') return termHit;
   return (
-    FAKE_NOTIFICATION_TERMS.some(t => text.includes(t)) ||
+    termHit ||
     CLICKBAIT_TERMS.some(t => text.includes(t)) ||
     /\(\d+\)|\b\d+\s+(messages?|snaps?|notifications?|unread)\b/i.test(text)
   );
@@ -786,7 +826,8 @@ function injectAntiNotificationCss() {
   (document.head || document.documentElement).appendChild(style);
 }
 
-const overlayLogSeen = new Set();
+const overlayLogSeen  = new Set();
+const overlayToastSeen = new Set();
 
 function logDomBlock(node, reason) {
   try {
@@ -801,6 +842,12 @@ function logDomBlock(node, reason) {
       url: location.href,
       hostname: location.hostname,
     });
+    // Aviso visible la primera vez que se detecta cada tipo de molestia en esta
+    // pestaña, para que el usuario sepa que AppSpawner actuó (sin saturar de toasts).
+    if (!overlayToastSeen.has(reason)) {
+      overlayToastSeen.add(reason);
+      showSsbToast(`AppSpawner: ${reason.toLowerCase()}`, 'warning');
+    }
   } catch {}
 }
 
@@ -809,7 +856,9 @@ function overlaysVideo(node) {
   const style = getComputedStyle(node);
   if (!['fixed', 'absolute', 'sticky'].includes(style.position)) return false;
   const z = Number.parseInt(style.zIndex, 10);
-  if (!Number.isFinite(z) || z < 100) return false;
+  const mode = getOverlayMode();
+  const zThreshold = mode === 'soft' ? 500 : mode === 'aggressive' ? 10 : 100;
+  if (!Number.isFinite(z) || z < zThreshold) return false;
   const rect = node.getBoundingClientRect();
   if (rect.width < 40 || rect.height < 40) return false;
   const opacity = Number.parseFloat(style.opacity || '1');
@@ -859,6 +908,13 @@ function scanAnnoyances(root = document) {
       continue;
     }
     if (overlaysVideo(node)) {
+      if (getOverlayMode() === 'aggressive' && isFloatingOverlay(node)) {
+        // En modo agresivo, los overlays grandes y de z-index alto se eliminan
+        // directamente en lugar de solo neutralizar el puntero.
+        logDomBlock(node, 'Overlay sobre video eliminado (modo agresivo)');
+        node.remove();
+        continue;
+      }
       node.style.pointerEvents = 'none';
       node.style.cursor = 'default';
       node.setAttribute('data-appspawner-overlay-neutralized', 'true');
@@ -872,6 +928,12 @@ function runAnnoyanceSweep() {
   scanAnnoyances();
   setTimeout(() => scanAnnoyances(), 600);
   setTimeout(() => scanAnnoyances(), 1800);
+  // Modo agresivo: barrido periodico continuo, los overlays de redirect/popunder
+  // suelen insertarse con retardos variables tras interacciones del usuario.
+  if (getOverlayMode() === 'aggressive') {
+    if (window.__appSpawnerAggressiveSweep) clearInterval(window.__appSpawnerAggressiveSweep);
+    window.__appSpawnerAggressiveSweep = setInterval(() => scanAnnoyances(), 2500);
+  }
 }
 
 function installAntiAnnoyanceGuard() {

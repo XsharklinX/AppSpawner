@@ -64,8 +64,8 @@ export default function Storage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-base font-semibold text-white mb-0.5">{t('set_storage')}</h2>
-          <p className="text-sm text-white/35">{t('stor_desc')}</p>
+          <h2 className="text-base font-semibold text-fg mb-0.5">{t('set_storage')}</h2>
+          <p className="text-sm text-fg/35">{t('stor_desc')}</p>
         </div>
         <button
           onClick={loadStorage}
@@ -79,12 +79,12 @@ export default function Storage() {
       {/* Resumen total */}
       {totalBytes > 0 && (
         <div className="glass rounded-xl p-4 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-white/[0.05] flex items-center justify-center">
-            <HardDrive size={17} className="text-white/50" />
+          <div className="w-9 h-9 rounded-xl bg-overlay/[0.05] flex items-center justify-center">
+            <HardDrive size={17} className="text-fg/50" />
           </div>
           <div>
-            <p className="text-xs text-white/35">Total en disco (datos de sesión)</p>
-            <p className="text-base font-bold text-white/80">{formatBytes(totalBytes)}</p>
+            <p className="text-xs text-fg/35">Total en disco (datos de sesión)</p>
+            <p className="text-base font-bold text-fg/80">{formatBytes(totalBytes)}</p>
           </div>
         </div>
       )}
@@ -98,8 +98,8 @@ export default function Storage() {
         </div>
       ) : storageData.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-10 gap-3">
-          <AlertCircle size={24} className="text-white/15" />
-          <p className="text-sm text-white/30">No hay apps instaladas</p>
+          <AlertCircle size={24} className="text-fg/15" />
+          <p className="text-sm text-fg/30">No hay apps instaladas</p>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
@@ -123,7 +123,7 @@ export default function Storage() {
 function StorageRow({ app, t, confirm, clearing, onClear, onUninstall }) {
   const bytes = app.storageBytes || 0;
   return (
-    <div className="glass rounded-xl p-3.5 flex items-center gap-3 hover:border-white/[0.09] transition-colors">
+    <div className="glass rounded-xl p-3.5 flex items-center gap-3 hover:border-line/[0.09] transition-colors">
       <AppIcon
         iconType={app.iconType}
         iconValue={app.iconValue}
@@ -132,8 +132,8 @@ function StorageRow({ app, t, confirm, clearing, onClear, onUninstall }) {
         size={36}
       />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-white/80 truncate">{app.name}</p>
-        <p className="text-xs text-white/30 mt-0.5">
+        <p className="text-sm font-medium text-fg/80 truncate">{app.name}</p>
+        <p className="text-xs text-fg/30 mt-0.5">
           {bytes > 0 ? formatBytes(bytes) : t('stor_no_data')}
         </p>
       </div>
@@ -147,7 +147,7 @@ function StorageRow({ app, t, confirm, clearing, onClear, onUninstall }) {
               transition-all duration-150 active:scale-95
               ${confirm[app.id]
                 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/25'
-                : 'bg-white/[0.04] text-white/40 hover:text-white/70 border border-white/[0.06]'
+                : 'bg-overlay/[0.04] text-fg/40 hover:text-fg/70 border border-line/[0.06]'
               }
             `}
           >
@@ -162,7 +162,7 @@ function StorageRow({ app, t, confirm, clearing, onClear, onUninstall }) {
             transition-all duration-150 active:scale-95
             ${confirm[`del_${app.id}`]
               ? 'bg-red-500/25 text-red-400 border border-red-500/30'
-              : 'bg-white/[0.04] text-white/35 hover:text-red-400/70 border border-white/[0.06]'
+              : 'bg-overlay/[0.04] text-fg/35 hover:text-red-400/70 border border-line/[0.06]'
             }
           `}
         >

@@ -208,10 +208,10 @@ export default function Backup() {
   return (
     <div className="flex flex-col gap-6 max-w-5xl">
       <div>
-        <h2 className="text-base font-semibold text-white mb-0.5 flex items-center gap-2">
+        <h2 className="text-base font-semibold text-fg mb-0.5 flex items-center gap-2">
           <Archive size={16} className="text-violet-400" /> Backup, salud y portabilidad
         </h2>
-        <p className="text-sm text-white/35 leading-relaxed max-w-3xl">
+        <p className="text-sm text-fg/35 leading-relaxed max-w-3xl">
           Exporta la configuracion completa, mantiene copias locales y revisa problemas frecuentes antes de migrar o actualizar.
         </p>
       </div>
@@ -222,7 +222,7 @@ export default function Backup() {
             <div className="w-9 h-9 rounded-xl bg-violet-600/15 text-violet-300 flex items-center justify-center">
               <Icon size={16} />
             </div>
-            <p className="text-sm text-white/65 leading-snug">{label}</p>
+            <p className="text-sm text-fg/65 leading-snug">{label}</p>
           </div>
         ))}
       </div>
@@ -230,8 +230,8 @@ export default function Backup() {
       <section className="glass rounded-xl p-4 border-violet-500/15 bg-violet-500/[0.03]">
         <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold text-white/82">QA de version v3.2</p>
-            <p className="text-xs text-white/35 mt-1 max-w-3xl">
+            <p className="text-sm font-semibold text-fg/82">QA de version v3.2</p>
+            <p className="text-xs text-fg/35 mt-1 max-w-3xl">
               Esta version queda enfocada en estabilizar instalacion, accesos directos, migracion local y comprobaciones previas a build.
             </p>
           </div>
@@ -257,9 +257,9 @@ export default function Backup() {
           </div>
           <div className="grid md:grid-cols-2 gap-2">
             {RELEASE_CHECKS.map(item => (
-              <div key={item} className="rounded-xl border border-white/[0.06] bg-white/[0.025] px-3 py-2 flex items-start gap-2">
+              <div key={item} className="rounded-xl border border-line/[0.06] bg-overlay/[0.025] px-3 py-2 flex items-start gap-2">
                 <CheckCircle2 size={14} className="text-violet-300 mt-0.5 flex-shrink-0" />
-                <span className="text-xs text-white/55 leading-relaxed">{item}</span>
+                <span className="text-xs text-fg/55 leading-relaxed">{item}</span>
               </div>
             ))}
           </div>
@@ -270,8 +270,8 @@ export default function Backup() {
         <section className="glass rounded-xl p-4 flex flex-col gap-4">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold text-white/82">Exportar o importar backup completo</p>
-              <p className="text-xs text-white/35 mt-1">
+              <p className="text-sm font-semibold text-fg/82">Exportar o importar backup completo</p>
+              <p className="text-xs text-fg/35 mt-1">
                 Incluye apps, perfiles, workspaces, ajustes, scripts, snapshots y secretos cifrados.
               </p>
             </div>
@@ -298,7 +298,7 @@ export default function Backup() {
                 className={`rounded-xl border p-3 text-left transition-all ${
                   mode === value
                     ? 'bg-violet-600/18 border-violet-500/35 text-violet-200'
-                    : 'bg-white/[0.025] border-white/[0.07] text-white/48 hover:text-white/72'
+                    : 'bg-overlay/[0.025] border-line/[0.07] text-fg/48 hover:text-fg/72'
                 }`}
               >
                 <p className="text-sm font-semibold">{label}</p>
@@ -311,21 +311,21 @@ export default function Backup() {
         <section className="glass rounded-xl p-4 flex flex-col gap-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold text-white/82 flex items-center gap-2">
+              <p className="text-sm font-semibold text-fg/82 flex items-center gap-2">
                 <HardDrive size={15} className="text-cyan-300" /> Backup automatico local
               </p>
-              <p className="text-xs text-white/35 mt-1">Guarda copias periodicas en la carpeta de datos de AppSpawner.</p>
+              <p className="text-xs text-fg/35 mt-1">Guarda copias periodicas en la carpeta de datos de AppSpawner.</p>
             </div>
             <button
               onClick={() => updateSetting({ autoBackupEnabled: !(settings?.autoBackupEnabled ?? true) })}
-              className={`relative w-10 h-6 rounded-full transition-colors ${(settings?.autoBackupEnabled ?? true) ? 'bg-violet-600' : 'bg-white/12'}`}
+              className={`relative w-10 h-6 rounded-full transition-colors ${(settings?.autoBackupEnabled ?? true) ? 'bg-violet-600' : 'bg-overlay/12'}`}
             >
               <span className={`absolute left-1 top-1 w-4 h-4 rounded-full bg-white transition-transform ${(settings?.autoBackupEnabled ?? true) ? 'translate-x-4' : 'translate-x-0'}`} />
             </button>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <label className="text-xs text-white/40">
+            <label className="text-xs text-fg/40">
               Intervalo (h)
               <input
                 type="number"
@@ -335,7 +335,7 @@ export default function Backup() {
                 className="input-field mt-1 w-full py-2 text-sm"
               />
             </label>
-            <label className="text-xs text-white/40">
+            <label className="text-xs text-fg/40">
               Mantener
               <input
                 type="number"
@@ -358,10 +358,10 @@ export default function Backup() {
         <section className="glass rounded-xl p-4 flex flex-col gap-4">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold text-white/82 flex items-center gap-2">
+              <p className="text-sm font-semibold text-fg/82 flex items-center gap-2">
                 <Stethoscope size={15} className="text-emerald-300" /> Diagnostico de salud
               </p>
-              <p className="text-xs text-white/35 mt-1">
+              <p className="text-xs text-fg/35 mt-1">
                 Revisa shortcuts rotos, sesiones corruptas, iconos faltantes, URLs invalidas y duplicados.
               </p>
             </div>
@@ -388,19 +388,19 @@ export default function Backup() {
 
           <div className="flex flex-col gap-2 max-h-64 overflow-y-auto scrollbar-thin pr-1">
             {!diagnostics?.issues?.length && (
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 flex items-center gap-2 text-sm text-white/45">
+              <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.025] p-3 flex items-center gap-2 text-sm text-fg/45">
                 <CheckCircle2 size={15} className="text-emerald-300" />
                 Sin incidencias cargadas.
               </div>
             )}
             {diagnostics?.issues?.map((issue, index) => (
-              <div key={`${issue.type}-${index}`} className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
+              <div key={`${issue.type}-${index}`} className="rounded-xl border border-line/[0.06] bg-overlay/[0.025] p-3">
                 <div className="flex items-start gap-2">
                   <AlertTriangle size={14} className={issue.severity === 'error' ? 'text-red-300 mt-0.5' : 'text-amber-300 mt-0.5'} />
                   <div className="min-w-0">
-                    <p className="text-sm text-white/75 font-medium">{issue.appName || issue.type}</p>
-                    <p className="text-xs text-white/40 mt-0.5">{issue.message}</p>
-                    {issue.path && <p className="text-[10px] text-white/25 mt-1 font-mono truncate">{issue.path}</p>}
+                    <p className="text-sm text-fg/75 font-medium">{issue.appName || issue.type}</p>
+                    <p className="text-xs text-fg/40 mt-0.5">{issue.message}</p>
+                    {issue.path && <p className="text-[10px] text-fg/25 mt-1 font-mono truncate">{issue.path}</p>}
                   </div>
                 </div>
               </div>
@@ -410,17 +410,17 @@ export default function Backup() {
 
         <section className="glass rounded-xl p-4 flex flex-col gap-4">
           <div>
-            <p className="text-sm font-semibold text-white/82 flex items-center gap-2">
+            <p className="text-sm font-semibold text-fg/82 flex items-center gap-2">
               <PackageCheck size={15} className="text-violet-300" /> Actualizador y modo portable
             </p>
-            <p className="text-xs text-white/35 mt-1">Estado de version, canal y ruta de datos actual.</p>
+            <p className="text-xs text-fg/35 mt-1">Estado de version, canal y ruta de datos actual.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <InfoTile label="Version" value={updateInfo?.currentVersion || '3.2.0'} />
             <InfoTile label="Canal" value={updateInfo?.channel || 'stable'} />
           </div>
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 text-xs text-white/45 leading-relaxed">
+          <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.025] p-3 text-xs text-fg/45 leading-relaxed">
             {updateInfo?.status || 'El actualizador integrado queda preparado para conectar un feed firmado en la build de distribucion.'}
           </div>
 
@@ -428,10 +428,10 @@ export default function Backup() {
 
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold text-white/82 flex items-center gap-2">
+              <p className="text-sm font-semibold text-fg/82 flex items-center gap-2">
                 <Laptop size={15} className="text-cyan-300" /> Modo portable
               </p>
-              <p className="text-xs text-white/35 mt-1">
+              <p className="text-xs text-fg/35 mt-1">
                 Marca la instalacion para trabajar como portable cuando se empaquete con carpeta local de datos.
               </p>
             </div>
@@ -440,28 +440,28 @@ export default function Backup() {
                 await updateSetting({ portableMode: !(settings?.portableMode ?? false) });
                 await loadRuntimeInfo();
               }}
-              className={`relative w-10 h-6 rounded-full transition-colors ${(settings?.portableMode ?? false) ? 'bg-violet-600' : 'bg-white/12'}`}
+              className={`relative w-10 h-6 rounded-full transition-colors ${(settings?.portableMode ?? false) ? 'bg-violet-600' : 'bg-overlay/12'}`}
             >
               <span className={`absolute left-1 top-1 w-4 h-4 rounded-full bg-white transition-transform ${(settings?.portableMode ?? false) ? 'translate-x-4' : 'translate-x-0'}`} />
             </button>
           </div>
-          <p className="text-[10px] text-white/25 font-mono leading-relaxed break-all">{portableInfo?.userDataPath || 'Ruta de datos no cargada'}</p>
+          <p className="text-[10px] text-fg/25 font-mono leading-relaxed break-all">{portableInfo?.userDataPath || 'Ruta de datos no cargada'}</p>
         </section>
       </div>
 
       <section className="glass rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-semibold text-white/82">Backups locales recientes</p>
-          <span className="text-xs text-white/30">{backups.length} archivos</span>
+          <p className="text-sm font-semibold text-fg/82">Backups locales recientes</p>
+          <span className="text-xs text-fg/30">{backups.length} archivos</span>
         </div>
         <div className="grid md:grid-cols-2 gap-2">
           {backups.slice(0, 6).map(backup => (
-            <div key={backup.path} className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 min-w-0">
-              <p className="text-sm text-white/70 font-medium truncate">{backup.name}</p>
-              <p className="text-xs text-white/35 mt-1">{formatDate(backup.modifiedAt)} - {formatSize(backup.size)}</p>
+            <div key={backup.path} className="rounded-xl border border-line/[0.06] bg-overlay/[0.025] p-3 min-w-0">
+              <p className="text-sm text-fg/70 font-medium truncate">{backup.name}</p>
+              <p className="text-xs text-fg/35 mt-1">{formatDate(backup.modifiedAt)} - {formatSize(backup.size)}</p>
             </div>
           ))}
-          {backups.length === 0 && <p className="text-sm text-white/35">Todavia no hay backups locales.</p>}
+          {backups.length === 0 && <p className="text-sm text-fg/35">Todavia no hay backups locales.</p>}
         </div>
       </section>
 
@@ -473,9 +473,9 @@ export default function Backup() {
       </div>
 
       {lastResult && (
-        <div className="glass rounded-xl p-3 text-xs text-white/45 animate-fade-in">
+        <div className="glass rounded-xl p-3 text-xs text-fg/45 animate-fade-in">
           {lastResult.type === 'export' || lastResult.type === 'local'
-            ? <>Ultimo backup: <span className="text-white/70 font-mono">{lastResult.path}</span></>
+            ? <>Ultimo backup: <span className="text-fg/70 font-mono">{lastResult.path}</span></>
             : <>Ultima importacion: {lastResult.apps} apps, {lastResult.profiles} perfiles, {lastResult.workspaces} workspaces.</>
           }
         </div>
@@ -486,9 +486,9 @@ export default function Backup() {
 
 function InfoTile({ label, value }) {
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
-      <p className="text-[10px] uppercase tracking-wider text-white/30">{label}</p>
-      <p className="text-sm text-white/78 font-semibold mt-1 truncate">{value}</p>
+    <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.025] p-3">
+      <p className="text-[10px] uppercase tracking-wider text-fg/30">{label}</p>
+      <p className="text-sm text-fg/78 font-semibold mt-1 truncate">{value}</p>
     </div>
   );
 }

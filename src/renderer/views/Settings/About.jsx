@@ -112,8 +112,8 @@ export default function About() {
           </svg>
         </div>
         <div>
-          <h2 className="text-lg font-bold text-white">{APP_NAME}</h2>
-          <p className="text-sm text-white/40">{APP_BUILD}</p>
+          <h2 className="text-lg font-bold text-fg">{APP_NAME}</h2>
+          <p className="text-sm text-fg/40">{APP_BUILD}</p>
         </div>
       </div>
 
@@ -136,14 +136,14 @@ export default function About() {
 
       {/* ── Stack tecnológico ────────────────────────────────────────────── */}
       <div>
-        <h3 className="text-xs font-semibold text-white/35 uppercase tracking-wider mb-2.5">Stack</h3>
+        <h3 className="text-xs font-semibold text-fg/35 uppercase tracking-wider mb-2.5">Stack</h3>
         <div className="grid grid-cols-2 gap-2">
           {TECH_STACK.map(({ label, value }) => (
             <div key={label} className="glass rounded-xl px-3.5 py-2.5 flex items-center gap-2">
               <Cpu size={12} className="text-violet-400 flex-shrink-0" />
               <div>
-                <p className="text-[10px] text-white/30">{label}</p>
-                <p className="text-xs font-medium text-white/70">{value}</p>
+                <p className="text-[10px] text-fg/30">{label}</p>
+                <p className="text-xs font-medium text-fg/70">{value}</p>
               </div>
             </div>
           ))}
@@ -151,21 +151,21 @@ export default function About() {
       </div>
 
       {/* ── Descripción ──────────────────────────────────────────────────── */}
-      <p className="text-sm text-white/35 leading-relaxed">{t('about_desc')}</p>
+      <p className="text-sm text-fg/35 leading-relaxed">{t('about_desc')}</p>
 
       <div className="grid grid-cols-2 gap-2">
         <a href="mailto:contactosharklin@gmail.com" className="glass rounded-xl px-3.5 py-2.5 flex items-center gap-2 hover:border-violet-500/25 transition-colors">
           <Mail size={13} className="text-violet-400 flex-shrink-0" />
           <div className="min-w-0">
-            <p className="text-[10px] text-white/30">Quejas y mejoras</p>
-            <p className="text-xs font-medium text-white/70 truncate">contactosharklin@gmail.com</p>
+            <p className="text-[10px] text-fg/30">Quejas y mejoras</p>
+            <p className="text-xs font-medium text-fg/70 truncate">contactosharklin@gmail.com</p>
           </div>
         </a>
         <div className="glass rounded-xl px-3.5 py-2.5 flex items-center gap-2">
           <UserRound size={13} className="text-violet-400 flex-shrink-0" />
           <div>
-            <p className="text-[10px] text-white/30">Desarrollador</p>
-            <p className="text-xs font-medium text-white/70">Sharklin</p>
+            <p className="text-[10px] text-fg/30">Desarrollador</p>
+            <p className="text-xs font-medium text-fg/70">Sharklin</p>
           </div>
         </div>
       </div>
@@ -190,8 +190,8 @@ export default function About() {
           <div className="glass rounded-xl p-4 flex items-start gap-3 animate-fade-in border border-violet-500/20">
             <ArrowUpCircle size={18} className="text-violet-400 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-semibold text-white/85">Nueva versión disponible: {updateState.version}</p>
-              <p className="text-xs text-white/40 mt-0.5">Hay una actualización disponible para AppSpawner.</p>
+              <p className="text-sm font-semibold text-fg/85">Nueva versión disponible: {updateState.version}</p>
+              <p className="text-xs text-fg/40 mt-0.5">Hay una actualización disponible para AppSpawner.</p>
               <button
                 onClick={() => window.electronAPI?.openExternal(updateState.url)}
                 className="mt-2 btn-primary text-xs flex items-center gap-2 w-fit"
@@ -205,11 +205,11 @@ export default function About() {
 
       {/* ── Import / Export ──────────────────────────────────────────────── */}
       <div>
-        <h3 className="text-xs font-semibold text-white/35 uppercase tracking-wider mb-2.5">
+        <h3 className="text-xs font-semibold text-fg/35 uppercase tracking-wider mb-2.5">
           Backup de datos
         </h3>
         <div className="glass rounded-xl p-4 flex flex-col gap-3">
-          <p className="text-xs text-white/35 leading-relaxed">
+          <p className="text-xs text-fg/35 leading-relaxed">
             Exporta tus apps a JSON para hacer backup o mover la configuración a otro equipo.
           </p>
           <div className="flex gap-2 flex-wrap">
@@ -226,7 +226,7 @@ export default function About() {
               className="btn-ghost flex items-center gap-2 text-xs"
             >
               {importing
-                ? <div className="w-3 h-3 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
+                ? <div className="w-3 h-3 border-2 border-line/30 border-t-white/80 rounded-full animate-spin" />
                 : <Upload size={13} />
               }
               Importar backup
@@ -253,7 +253,7 @@ export default function About() {
       </div>
 
       {/* ── Footer ──────────────────────────────────────────────────────── */}
-      <div className="text-xs text-white/25 pt-2 border-t border-white/[0.05]">
+      <div className="text-xs text-fg/25 pt-2 border-t border-line/[0.05]">
         Hecho con ♥ usando Electron + React
       </div>
     </div>
@@ -263,8 +263,8 @@ export default function About() {
 function InfoRow({ label, value }) {
   return (
     <div className="flex items-center justify-between px-4 py-3">
-      <span className="text-sm text-white/45">{label}</span>
-      <span className="text-sm font-medium text-white/75">{value}</span>
+      <span className="text-sm text-fg/45">{label}</span>
+      <span className="text-sm font-medium text-fg/75">{value}</span>
     </div>
   );
 }

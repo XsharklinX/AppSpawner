@@ -37,7 +37,7 @@ export default function Menu({ trigger, items, align = 'end', className = '' }) 
           role="menu"
           className={`
             absolute z-50 top-full mt-1.5 min-w-[180px] py-1.5
-            rounded-xl border border-white/[0.08] shadow-card-hover
+            rounded-xl border border-line/[0.08] shadow-card-hover
             animate-scale-in origin-top-${align === 'end' ? 'right' : 'left'}
             ${ALIGN[align] || ALIGN.end}
           `}
@@ -52,10 +52,10 @@ export default function Menu({ trigger, items, align = 'end', className = '' }) 
               className={`
                 w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-left transition-colors
                 ${disabled
-                  ? 'text-white/20 cursor-not-allowed'
+                  ? 'text-fg/20 cursor-not-allowed'
                   : danger
                     ? 'text-red-400/90 hover:bg-red-500/10 hover:text-red-400'
-                    : 'text-white/65 hover:bg-white/[0.06] hover:text-white/95'}
+                    : 'text-fg/65 hover:bg-overlay/[0.06] hover:text-fg/95'}
               `}
             >
               {Icon && <Icon size={14} className="flex-shrink-0" />}

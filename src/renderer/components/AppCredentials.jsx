@@ -79,7 +79,7 @@ export default function AppCredentials({ app }) {
       {/* Info de seguridad */}
       <div className="flex items-start gap-3 glass rounded-xl p-3.5">
         <ShieldCheck size={15} className="text-emerald-400 mt-0.5 flex-shrink-0" />
-        <p className="text-xs text-white/40 leading-relaxed">
+        <p className="text-xs text-fg/40 leading-relaxed">
           Las credenciales se guardan cifradas usando el llavero del sistema operativo (Windows DPAPI / macOS Keychain). No se sincronizan ni se envían a ningún servidor.
         </p>
       </div>
@@ -89,13 +89,13 @@ export default function AppCredentials({ app }) {
         <div className="glass rounded-xl px-4 py-3 flex items-center gap-3">
           <KeyRound size={16} className="text-violet-400 flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white/80 truncate">{creds.username}</p>
-            <p className="text-[11px] text-white/30">••••••••••••</p>
+            <p className="text-sm font-medium text-fg/80 truncate">{creds.username}</p>
+            <p className="text-[11px] text-fg/30">••••••••••••</p>
           </div>
           <button onClick={() => setShowForm(true)} className="text-xs text-violet-400 hover:text-violet-300 transition-colors">
             Editar
           </button>
-          <button onClick={handleDelete} className="text-white/20 hover:text-red-400 transition-colors p-1">
+          <button onClick={handleDelete} className="text-fg/20 hover:text-red-400 transition-colors p-1">
             <Trash2 size={13} />
           </button>
         </div>
@@ -106,7 +106,7 @@ export default function AppCredentials({ app }) {
       {/* Formulario de edición */}
       {(!creds || showForm) && (
         <div className="flex flex-col gap-3 glass rounded-xl p-4">
-          <p className="text-xs font-semibold text-white/35 uppercase tracking-wider">
+          <p className="text-xs font-semibold text-fg/35 uppercase tracking-wider">
             {creds ? 'Actualizar credenciales' : 'Guardar credenciales'}
           </p>
           <input
@@ -130,14 +130,14 @@ export default function AppCredentials({ app }) {
             <button
               type="button"
               onClick={() => setShowPwd(v => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-fg/30 hover:text-fg/60"
             >
               {showPwd ? <EyeOff size={14} /> : <Eye size={14} />}
             </button>
           </div>
           <div className="flex gap-2">
             <button onClick={handleSave} disabled={saving || !username.trim() || !password.trim()} className="btn-primary flex items-center gap-2 text-sm flex-1 justify-center">
-              {saving ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <Save size={13} />}
+              {saving ? <div className="w-4 h-4 border-2 border-line/40 border-t-white rounded-full animate-spin" /> : <Save size={13} />}
               Guardar
             </button>
             {showForm && <button onClick={() => setShowForm(false)} className="btn-ghost text-sm">Cancelar</button>}
@@ -153,12 +153,12 @@ export default function AppCredentials({ app }) {
           className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${
             isOpen
               ? 'bg-violet-600 hover:bg-violet-500 text-white active:scale-[0.98]'
-              : 'bg-white/[0.04] text-white/25 cursor-default'
+              : 'bg-overlay/[0.04] text-fg/25 cursor-default'
           }`}
           title={!isOpen ? 'Abre la app primero' : 'Rellenar formulario de login'}
         >
           {filling
-            ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            ? <div className="w-4 h-4 border-2 border-line/40 border-t-white rounded-full animate-spin" />
             : <Zap size={15} />
           }
           {filling ? 'Rellenando…' : isOpen ? 'Rellenar formulario de login' : 'Abre la app para hacer autofill'}

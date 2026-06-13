@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Plus, Save, Globe, AlertCircle, CheckCircle2, ChevronDown, Image, Type, Monitor, Maximize2, PictureInPicture, Upload, Keyboard, Wrench, RotateCw, Home, StickyNote, Code2, Undo2, Redo2, LockKeyhole, ShieldCheck, Play, BriefcaseBusiness, UserRound } from 'lucide-react';
+import { ArrowLeft, Plus, Save, Globe, AlertCircle, CheckCircle2, ChevronDown, Image, Type, Monitor, Maximize2, PictureInPicture, Upload, Keyboard, Wrench, RotateCw, Home, StickyNote, Code2, Undo2, Redo2, LockKeyhole, ShieldCheck, Play, BriefcaseBusiness, UserRound, Tv, Sparkles, GraduationCap } from 'lucide-react';
 import AppIcon    from '../components/common/AppIcon';
 import Switch     from '../components/common/Switch';
 import ShortcutInput from '../components/common/ShortcutInput';
 import { useApps }        from '../contexts/AppContext';
 import { useI18n }        from '../contexts/I18nContext';
 import { useWorkspaces }  from '../contexts/WorkspaceContext';
-import { CATEGORIES }     from '../lib/constants';
+import { CATEGORIES, APP_TEMPLATES } from '../lib/constants';
 import { isValidUrl, normalizeUrl, seedColor, getInitials } from '../lib/utils';
 
 const COLOR_PALETTE = [
@@ -43,6 +43,14 @@ const SHORTCUT_FIELDS = [
   ['pip', 'PiP'],
 ];
 
+const TEMPLATE_ICONS = {
+  streaming:     Tv,
+  ia:            Sparkles,
+  productividad: BriefcaseBusiness,
+  desarrollo:    Code2,
+  estudio:       GraduationCap,
+};
+
 export default function CreateApp({
   onNavigate,
   editMode    = false,
@@ -52,7 +60,7 @@ export default function CreateApp({
 }) {
   const { installApp, updateApp } = useApps();
   const { workspaces }             = useWorkspaces();
-  const { t }                      = useI18n();
+  const { t, language }            = useI18n();
 
   const [form, setForm] = useState({
     name:            initialData?.name         || '',
@@ -75,8 +83,13 @@ export default function CreateApp({
       interval: initialData?.screenshotConfig?.interval || 30,
     },
     adblockEnabled: initialData?.adblockEnabled !== false,
+    adblockAggressiveOverride: initialData?.adblockAggressiveOverride ?? null,
     notificationsEnabled: initialData?.notificationsEnabled === true,
     userAgent:      initialData?.userAgent    || '',
+    windowConfig: {
+      width:  initialData?.windowConfig?.width  || 1280,
+      height: initialData?.windowConfig?.height || 800,
+    },
     toolbar: {
       enabled: initialData?.toolbar?.enabled || false,
       buttons: initialData?.toolbar?.buttons || ['back','forward','reload','home','pip','notes','devtools'],
@@ -111,6 +124,7 @@ export default function CreateApp({
   const [errors,   setErrors]     = useState({});
   const [saving,   setSaving]     = useState(false);
   const [showUA,   setShowUA]     = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
 
   // Iniciales calculadas para el preview
   const iconValue = form.iconType === 'customImage'
@@ -153,6 +167,33 @@ export default function CreateApp({
     }));
   }, []);
 
+  // Aplica una plantilla rapida (categoria, adblock, toolbar, atajos, ventana)
+  const applyTemplate = useCallback((template) => {
+    if (selectedTemplate === template.id) {
+      setSelectedTemplate(null);
+      return;
+    }
+    setSelectedTemplate(template.id);
+    const cfg = template.config || {};
+    setForm(prev => ({
+      ...prev,
+      category: template.category || prev.category,
+      openMode: cfg.openMode || prev.openMode,
+      adblockEnabled: cfg.adblockEnabled !== undefined ? cfg.adblockEnabled : prev.adblockEnabled,
+      adblockAggressiveOverride: cfg.adblockAggressive ? true : prev.adblockAggressiveOverride,
+      toolbar: cfg.toolbar ? {
+        enabled: cfg.toolbar.enabled,
+        buttons: cfg.toolbar.buttons.filter(b => TOOLBAR_BUTTONS.some(tb => tb.value === b)),
+      } : prev.toolbar,
+      shortcuts: cfg.shortcuts?.bindings ? {
+        ...prev.shortcuts,
+        enabled: cfg.shortcuts.enabled !== undefined ? cfg.shortcuts.enabled : prev.shortcuts.enabled,
+        ...Object.fromEntries(Object.entries(cfg.shortcuts.bindings).filter(([k]) => k in prev.shortcuts)),
+      } : prev.shortcuts,
+      windowConfig: cfg.windowConfig ? { ...prev.windowConfig, ...cfg.windowConfig } : prev.windowConfig,
+    }));
+  }, [selectedTemplate]);
+
   const validate = () => {
     const e = {};
     if (!form.name.trim())                   e.name = t('form_name_error');
@@ -176,8 +217,10 @@ export default function CreateApp({
         workspaceId:     form.workspaceId  || null,
         openMode:        form.openMode     || 'normal',
         adblockEnabled:  form.adblockEnabled,
+        adblockAggressiveOverride: form.adblockAggressiveOverride,
         notificationsEnabled: form.notificationsEnabled,
         iconType:        form.iconType,
+        windowConfig:    form.windowConfig,
       };
 
       if (editMode && initialData) {
@@ -218,7 +261,7 @@ export default function CreateApp({
         <div className="flex-shrink-0 px-7 pt-6 pb-4">
           <button
             onClick={() => onNavigate?.('dashboard')}
-            className="flex items-center gap-2 text-sm text-white/35 hover:text-white/65 transition-colors mb-5"
+            className="flex items-center gap-2 text-sm text-fg/35 hover:text-fg/65 transition-colors mb-5"
           >
             <ArrowLeft size={15} /> Volver al Dashboard
           </button>
@@ -230,10 +273,10 @@ export default function CreateApp({
               }
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">
+              <h1 className="text-xl font-bold text-fg">
                 {editMode ? t('edit_title') : t('create_title')}
               </h1>
-              <p className="text-xs text-white/35">{t('create_subtitle')}</p>
+              <p className="text-xs text-fg/35">{t('create_subtitle')}</p>
             </div>
           </div>
         </div>
@@ -245,7 +288,7 @@ export default function CreateApp({
           {/* Preview en tiempo real (solo standalone) */}
           {!embedded && (
             <div
-              className="rounded-2xl mb-5 overflow-hidden border border-white/[0.07]"
+              className="rounded-2xl mb-5 overflow-hidden border border-line/[0.07]"
               style={{ background: `linear-gradient(135deg, ${form.iconColor}18 0%, #0d0d1a 100%)` }}
             >
               {/* Banda de color */}
@@ -268,16 +311,16 @@ export default function CreateApp({
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-base font-bold text-white/90 truncate">
-                    {form.name || <span className="text-white/25 font-normal">{t('form_name_ph')}</span>}
+                  <p className="text-base font-bold text-fg/90 truncate">
+                    {form.name || <span className="text-fg/25 font-normal">{t('form_name_ph')}</span>}
                   </p>
                   {form.accountLabel && (
                     <span className="text-[10px] text-violet-400 bg-violet-500/15 px-1.5 py-0.5 rounded-full mt-0.5 inline-block border border-violet-500/20">
                       {form.accountLabel}
                     </span>
                   )}
-                  <p className="text-xs text-white/35 mt-1 truncate">
-                    {normalizeUrl(form.url) || <span className="text-white/20">{t('form_url_ph')}</span>}
+                  <p className="text-xs text-fg/35 mt-1 truncate">
+                    {normalizeUrl(form.url) || <span className="text-fg/20">{t('form_url_ph')}</span>}
                   </p>
                   <div className="flex items-center gap-2 mt-2">
                     <span className="category-badge capitalize">{form.category}</span>
@@ -290,11 +333,45 @@ export default function CreateApp({
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
 
+            {/* ── Plantillas rapidas (solo al crear) ───────────────────── */}
+            {!editMode && (
+              <div>
+                <label className="form-label">Plantilla rápida <span className="text-fg/25 font-normal">(opcional)</span></label>
+                <div className="grid grid-cols-5 gap-2">
+                  {APP_TEMPLATES.map(tpl => {
+                    const Icon   = TEMPLATE_ICONS[tpl.id] || Sparkles;
+                    const active = selectedTemplate === tpl.id;
+                    return (
+                      <button
+                        key={tpl.id}
+                        type="button"
+                        onClick={() => applyTemplate(tpl)}
+                        title={language === 'en' ? tpl.description_en : tpl.description_es}
+                        className={`flex flex-col items-center gap-1.5 px-2 py-2.5 rounded-xl border text-center transition-all ${
+                          active
+                            ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
+                            : 'bg-overlay/[0.03] border-line/[0.07] text-fg/45 hover:text-fg/70 hover:border-line/[0.12]'
+                        }`}
+                      >
+                        <Icon size={16} style={!active ? { color: tpl.accent } : undefined} />
+                        <span className="text-[11px] font-medium leading-tight">{language === 'en' ? tpl.label_en : tpl.label_es}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedTemplate && (
+                  <p className="mt-1.5 text-[11px] text-violet-300/70 flex items-center gap-1">
+                    <CheckCircle2 size={11} /> Plantilla aplicada: categoría, adblock, toolbar, atajos y tamaño de ventana.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* URL */}
             <div>
               <label className="form-label">{t('form_url')}</label>
               <div className="relative">
-                <Globe size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
+                <Globe size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-fg/25 pointer-events-none" />
                 <input
                   type="text"
                   value={form.url}
@@ -350,7 +427,7 @@ export default function CreateApp({
 
               {/* Etiqueta de cuenta (multi-cuenta) */}
               <div>
-                <label className="form-label">Etiqueta de cuenta <span className="text-white/25 font-normal">(opcional)</span></label>
+                <label className="form-label">Etiqueta de cuenta <span className="text-fg/25 font-normal">(opcional)</span></label>
                 <input
                   type="text"
                   value={form.accountLabel}
@@ -372,7 +449,7 @@ export default function CreateApp({
                   className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
                     form.iconType === 'favicon'
                       ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
-                      : 'bg-white/[0.03] border-white/[0.07] text-white/40 hover:text-white/60'
+                      : 'bg-overlay/[0.03] border-line/[0.07] text-fg/40 hover:text-fg/60'
                   }`}
                 >
                   <Image size={12} />
@@ -387,7 +464,7 @@ export default function CreateApp({
                   className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
                     form.iconType === 'initials'
                       ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
-                      : 'bg-white/[0.03] border-white/[0.07] text-white/40 hover:text-white/60'
+                      : 'bg-overlay/[0.03] border-line/[0.07] text-fg/40 hover:text-fg/60'
                   }`}
                 >
                   <Type size={12} />
@@ -399,7 +476,7 @@ export default function CreateApp({
                   className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
                     form.iconType === 'customImage'
                       ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
-                      : 'bg-white/[0.03] border-white/[0.07] text-white/40 hover:text-white/60'
+                      : 'bg-overlay/[0.03] border-line/[0.07] text-fg/40 hover:text-fg/60'
                   }`}
                 >
                   <Upload size={12} />
@@ -409,7 +486,7 @@ export default function CreateApp({
 
               {/* Opciones de iniciales (solo cuando está seleccionado) */}
               {form.iconType === 'initials' && (
-                <div className="flex flex-col gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                <div className="flex flex-col gap-3 p-3 rounded-xl bg-overlay/[0.02] border border-line/[0.05]">
                   <div>
                     <label className="form-label text-[11px]">{t('form_icon_initials')}</label>
                     <input
@@ -439,7 +516,7 @@ export default function CreateApp({
                           `}
                         />
                       ))}
-                      <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-white/15 hover:border-white/30 transition-colors"
+                      <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-line/15 hover:border-line/30 transition-colors"
                         style={{ background: form.iconColor }}
                         title="Color personalizado"
                       >
@@ -456,7 +533,7 @@ export default function CreateApp({
               )}
 
               {form.iconType === 'favicon' && urlState !== 'valid' && (
-                <p className="text-[11px] text-white/30 flex items-center gap-1.5 mt-1">
+                <p className="text-[11px] text-fg/30 flex items-center gap-1.5 mt-1">
                   <Globe size={11} />
                   Introduce una URL válida para previsualizar el favicon.
                 </p>
@@ -468,14 +545,14 @@ export default function CreateApp({
               <button
                 type="button"
                 onClick={() => setShowUA(prev => !prev)}
-                className="w-full flex items-center justify-between px-4 py-3 text-sm text-white/50 hover:text-white/70 transition-colors"
+                className="w-full flex items-center justify-between px-4 py-3 text-sm text-fg/50 hover:text-fg/70 transition-colors"
               >
                 <span className="font-medium">Opciones avanzadas</span>
                 <ChevronDown size={14} className={`transition-transform duration-200 ${showUA ? 'rotate-180' : ''}`} />
               </button>
 
               {showUA && (
-                <div className="px-4 pb-4 flex flex-col gap-4 border-t border-white/[0.05]">
+                <div className="px-4 pb-4 flex flex-col gap-4 border-t border-line/[0.05]">
 
                   {/* Workspace */}
                   {workspaces.length > 0 && (
@@ -510,7 +587,7 @@ export default function CreateApp({
                           className={`flex-1 flex flex-col items-center gap-1.5 py-2.5 rounded-xl text-[11px] font-medium border transition-all ${
                             form.openMode === value
                               ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
-                              : 'bg-white/[0.03] border-white/[0.07] text-white/35 hover:text-white/55'
+                              : 'bg-overlay/[0.03] border-line/[0.07] text-fg/35 hover:text-fg/55'
                           }`}
                         >
                           <Icon size={14} />
@@ -527,14 +604,14 @@ export default function CreateApp({
                       <label className="flex items-center gap-1.5 ml-auto cursor-pointer">
                         <div
                           onClick={() => field('toolbar', { ...form.toolbar, enabled: !form.toolbar.enabled })}
-                          className={`relative w-8 h-4 rounded-full transition-colors ${form.toolbar.enabled ? 'bg-violet-600' : 'bg-white/[0.1]'}`}
+                          className={`relative w-8 h-4 rounded-full transition-colors ${form.toolbar.enabled ? 'bg-violet-600' : 'bg-overlay/[0.1]'}`}
                         >
                           <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${form.toolbar.enabled ? 'translate-x-4' : ''}`} />
                         </div>
-                        <span className="text-[11px] text-white/40">Activar</span>
+                        <span className="text-[11px] text-fg/40">Activar</span>
                       </label>
                     </label>
-                    <p className="text-[11px] text-white/30 leading-relaxed">
+                    <p className="text-[11px] text-fg/30 leading-relaxed">
                       Muestra una barra flotante discreta dentro de la ventana con acciones rapidas para navegacion, PiP, notas y DevTools.
                     </p>
                     {form.toolbar.enabled && (
@@ -552,7 +629,7 @@ export default function CreateApp({
                                   : [...form.toolbar.buttons, value],
                               })}
                               className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-[11px] border transition-all ${
-                                checked ? 'bg-violet-600/20 border-violet-500/35 text-violet-300' : 'bg-white/[0.03] border-white/[0.07] text-white/35 hover:text-white/60'
+                                checked ? 'bg-violet-600/20 border-violet-500/35 text-violet-300' : 'bg-overlay/[0.03] border-line/[0.07] text-fg/35 hover:text-fg/60'
                               }`}
                             >
                               <Icon size={13} />
@@ -571,21 +648,21 @@ export default function CreateApp({
                       <label className="flex items-center gap-1.5 ml-auto cursor-pointer">
                         <div
                           onClick={() => field('shortcuts', { ...form.shortcuts, enabled: !form.shortcuts.enabled })}
-                          className={`relative w-8 h-4 rounded-full transition-colors ${form.shortcuts.enabled ? 'bg-violet-600' : 'bg-white/[0.1]'}`}
+                          className={`relative w-8 h-4 rounded-full transition-colors ${form.shortcuts.enabled ? 'bg-violet-600' : 'bg-overlay/[0.1]'}`}
                         >
                           <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${form.shortcuts.enabled ? 'translate-x-4' : ''}`} />
                         </div>
-                        <span className="text-[11px] text-white/40">Activar</span>
+                        <span className="text-[11px] text-fg/40">Activar</span>
                       </label>
                     </label>
-                    <p className="text-[11px] text-white/30 leading-relaxed">
+                    <p className="text-[11px] text-fg/30 leading-relaxed">
                       Haz clic en un atajo y pulsa la combinación deseada. Se aplican solo dentro de esta app.
                     </p>
                     {form.shortcuts.enabled && (
                       <div className="grid grid-cols-2 gap-2 mt-2">
                         {SHORTCUT_FIELDS.map(([key, label]) => (
                           <label key={key} className="flex flex-col gap-1">
-                            <span className="text-[10px] text-white/35">{label}</span>
+                            <span className="text-[10px] text-fg/35">{label}</span>
                             <ShortcutInput
                               value={form.shortcuts[key]}
                               onChange={val => field('shortcuts', { ...form.shortcuts, [key]: val })}
@@ -603,11 +680,11 @@ export default function CreateApp({
                       <label className="flex items-center gap-1.5 ml-auto cursor-pointer">
                         <div
                           onClick={() => field('proxy', { ...form.proxy, enabled: !form.proxy.enabled })}
-                          className={`relative w-8 h-4 rounded-full transition-colors ${form.proxy.enabled ? 'bg-violet-600' : 'bg-white/[0.1]'}`}
+                          className={`relative w-8 h-4 rounded-full transition-colors ${form.proxy.enabled ? 'bg-violet-600' : 'bg-overlay/[0.1]'}`}
                         >
                           <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${form.proxy.enabled ? 'translate-x-4' : ''}`} />
                         </div>
-                        <span className="text-[11px] text-white/40">Activar</span>
+                        <span className="text-[11px] text-fg/40">Activar</span>
                       </label>
                     </label>
                     {form.proxy.enabled && (
@@ -635,16 +712,16 @@ export default function CreateApp({
                       <label className="flex items-center gap-1.5 ml-auto cursor-pointer">
                         <div
                           onClick={() => field('screenshotConfig', { ...form.screenshotConfig, enabled: !form.screenshotConfig.enabled })}
-                          className={`relative w-8 h-4 rounded-full transition-colors ${form.screenshotConfig.enabled ? 'bg-violet-600' : 'bg-white/[0.1]'}`}
+                          className={`relative w-8 h-4 rounded-full transition-colors ${form.screenshotConfig.enabled ? 'bg-violet-600' : 'bg-overlay/[0.1]'}`}
                         >
                           <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${form.screenshotConfig.enabled ? 'translate-x-4' : ''}`} />
                         </div>
-                        <span className="text-[11px] text-white/40">Activar</span>
+                        <span className="text-[11px] text-fg/40">Activar</span>
                       </label>
                     </label>
                     {form.screenshotConfig.enabled && (
                       <div className="flex items-center gap-2 mt-2">
-                        <span className="text-xs text-white/40">Cada</span>
+                        <span className="text-xs text-fg/40">Cada</span>
                         <input
                           type="number"
                           value={form.screenshotConfig.interval}
@@ -652,7 +729,7 @@ export default function CreateApp({
                           className="input-field w-20 text-xs"
                           min="1" max="1440"
                         />
-                        <span className="text-xs text-white/40">minutos</span>
+                        <span className="text-xs text-fg/40">minutos</span>
                       </div>
                     )}
                   </div>
@@ -664,16 +741,16 @@ export default function CreateApp({
                       <label className="flex items-center gap-1.5 ml-auto cursor-pointer">
                         <div
                           onClick={() => field('adblockEnabled', !form.adblockEnabled)}
-                          className={`relative w-8 h-4 rounded-full transition-colors ${form.adblockEnabled ? 'bg-violet-600' : 'bg-white/[0.1]'}`}
+                          className={`relative w-8 h-4 rounded-full transition-colors ${form.adblockEnabled ? 'bg-violet-600' : 'bg-overlay/[0.1]'}`}
                         >
                           <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${form.adblockEnabled ? 'translate-x-4' : ''}`} />
                         </div>
-                        <span className="text-[11px] text-white/40">
+                        <span className="text-[11px] text-fg/40">
                           {form.adblockEnabled ? 'Activado' : 'Desactivado'}
                         </span>
                       </label>
                     </label>
-                    <p className="text-[11px] text-white/25 mt-1">
+                    <p className="text-[11px] text-fg/25 mt-1">
                       Hereda la configuración global. Desactiva solo si la app falla con el bloqueador.
                     </p>
                   </div>
@@ -685,16 +762,16 @@ export default function CreateApp({
                       <label className="flex items-center gap-1.5 ml-auto cursor-pointer">
                         <div
                           onClick={() => field('notificationsEnabled', !form.notificationsEnabled)}
-                          className={`relative w-8 h-4 rounded-full transition-colors ${form.notificationsEnabled ? 'bg-violet-600' : 'bg-white/[0.1]'}`}
+                          className={`relative w-8 h-4 rounded-full transition-colors ${form.notificationsEnabled ? 'bg-violet-600' : 'bg-overlay/[0.1]'}`}
                         >
                           <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${form.notificationsEnabled ? 'translate-x-4' : ''}`} />
                         </div>
-                        <span className="text-[11px] text-white/40">
+                        <span className="text-[11px] text-fg/40">
                           {form.notificationsEnabled ? 'Activadas' : 'Desactivadas'}
                         </span>
                       </label>
                     </label>
-                    <p className="text-[11px] text-white/25 mt-1">
+                    <p className="text-[11px] text-fg/25 mt-1">
                       Por defecto están bloqueadas (son el principal vector de spam de avisos falsos).
                       Actívalas solo para apps de confianza — se mostrarán como notificaciones nativas
                       del sistema operativo y al hacer clic abrirán la ventana de la app.
@@ -718,7 +795,7 @@ export default function CreateApp({
                           className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs border transition-all ${
                             form.security.profile === value
                               ? 'bg-violet-600/20 border-violet-500/35 text-violet-300'
-                              : 'bg-white/[0.03] border-white/[0.07] text-white/35 hover:text-white/60'
+                              : 'bg-overlay/[0.03] border-line/[0.07] text-fg/35 hover:text-fg/60'
                           }`}
                         >
                           <Icon size={13} /> {label}
@@ -730,7 +807,7 @@ export default function CreateApp({
                         type="button"
                         onClick={() => field('security', { ...form.security, sensitive: !form.security.sensitive })}
                         className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs border transition-all ${
-                          form.security.sensitive ? 'bg-amber-500/15 border-amber-500/30 text-amber-300' : 'bg-white/[0.03] border-white/[0.07] text-white/35 hover:text-white/60'
+                          form.security.sensitive ? 'bg-amber-500/15 border-amber-500/30 text-amber-300' : 'bg-overlay/[0.03] border-line/[0.07] text-fg/35 hover:text-fg/60'
                         }`}
                       >
                         <ShieldCheck size={13} /> Sensible
@@ -739,13 +816,13 @@ export default function CreateApp({
                         type="button"
                         onClick={() => field('security', { ...form.security, locked: !form.security.locked })}
                         className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs border transition-all ${
-                          form.security.locked ? 'bg-red-500/15 border-red-500/30 text-red-300' : 'bg-white/[0.03] border-white/[0.07] text-white/35 hover:text-white/60'
+                          form.security.locked ? 'bg-red-500/15 border-red-500/30 text-red-300' : 'bg-overlay/[0.03] border-line/[0.07] text-fg/35 hover:text-fg/60'
                         }`}
                       >
                         <LockKeyhole size={13} /> Pedir PIN al abrir
                       </button>
                     </div>
-                    <p className="text-[11px] text-white/25 mt-1">
+                    <p className="text-[11px] text-fg/25 mt-1">
                       Las apps bloqueadas requieren el PIN global configurado en Ajustes.
                     </p>
                   </div>
@@ -757,17 +834,17 @@ export default function CreateApp({
                       <label className="flex items-center gap-1.5 ml-auto cursor-pointer">
                         <div
                           onClick={() => field('automation', { ...form.automation, onOpen: { ...form.automation.onOpen, enabled: !form.automation.onOpen.enabled } })}
-                          className={`relative w-8 h-4 rounded-full transition-colors ${form.automation.onOpen.enabled ? 'bg-violet-600' : 'bg-white/[0.1]'}`}
+                          className={`relative w-8 h-4 rounded-full transition-colors ${form.automation.onOpen.enabled ? 'bg-violet-600' : 'bg-overlay/[0.1]'}`}
                         >
                           <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${form.automation.onOpen.enabled ? 'translate-x-4' : ''}`} />
                         </div>
-                        <span className="text-[11px] text-white/40">Activar</span>
+                        <span className="text-[11px] text-fg/40">Activar</span>
                       </label>
                     </label>
                     {form.automation.onOpen.enabled && (
                       <div className="mt-2 flex flex-col gap-2">
                         <div className="grid grid-cols-[120px_1fr] gap-2">
-                          <label className="text-[10px] text-white/35">
+                          <label className="text-[10px] text-fg/35">
                             Delay ms
                             <input
                               type="number"
@@ -782,7 +859,7 @@ export default function CreateApp({
                             type="button"
                             onClick={() => field('automation', { ...form.automation, onOpen: { ...form.automation.onOpen, reload: !form.automation.onOpen.reload } })}
                             className={`self-end flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs border transition-all ${
-                              form.automation.onOpen.reload ? 'bg-violet-600/20 border-violet-500/35 text-violet-300' : 'bg-white/[0.03] border-white/[0.07] text-white/35 hover:text-white/60'
+                              form.automation.onOpen.reload ? 'bg-violet-600/20 border-violet-500/35 text-violet-300' : 'bg-overlay/[0.03] border-line/[0.07] text-fg/35 hover:text-fg/60'
                             }`}
                           >
                             <RotateCw size={13} /> Recargar despues de abrir
@@ -818,7 +895,7 @@ export default function CreateApp({
                         <option key={ua.label} value={ua.value}>{ua.label}</option>
                       ))}
                     </select>
-                    <p className="mt-1.5 text-[11px] text-white/30 leading-relaxed">
+                    <p className="mt-1.5 text-[11px] text-fg/30 leading-relaxed">
                       Usa "Chrome" si el sitio web no carga correctamente con el user-agent de Electron.
                     </p>
                   </div>
@@ -849,7 +926,7 @@ export default function CreateApp({
                 `}
               >
                 {saving
-                  ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  ? <div className="w-4 h-4 border-2 border-line/40 border-t-white rounded-full animate-spin" />
                   : editMode ? <Save size={15} /> : <Plus size={15} />
                 }
                 {saving ? t('loading') : editMode ? t('form_save') : t('form_create')}

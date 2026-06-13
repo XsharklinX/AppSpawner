@@ -7,9 +7,14 @@
 const { v4: uuidv4 } = require('uuid');
 const { app, session } = require('electron');
 const { clearAppDiagnostics } = require('./diagnostics');
+const { ensureAppIcon } = require('../icon-utils');
+const { recreateShortcuts } = require('./shortcuts');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+
+// Campos cuyo cambio afecta el icono/nombre/destino de los accesos directos
+const SHORTCUT_FIELDS = ['name', 'iconType', 'iconValue', 'iconColor', 'openMode'];
 
 /** Genera un color de acento determinista */
 function seedColor(name) {
@@ -132,11 +137,27 @@ function mergeNestedAppUpdates(current, updates) {
 }
 
 /**
+ * Ejecuta `fn` sobre `items` con un máximo de `limit` tareas concurrentes,
+ * para no abrir cientos de file descriptors a la vez al recorrer particiones grandes.
+ */
+async function mapWithConcurrency(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+/**
  * Calcula el tamaño de la partición de una app de forma asíncrona.
  */
 async function getSessionSize(appId) {
   try {
-    const { du } = require('fs');
     // La sesión puede exponer cuota, pero no tamaño directo.
     // Accedemos al directorio de particiones de Chromium.
     const path = require('path');
@@ -147,11 +168,12 @@ async function getSessionSize(appId) {
       let size = 0;
       try {
         const entries = await fs.readdir(dir, { withFileTypes: true });
-        await Promise.all(entries.map(async e => {
+        const sizes = await mapWithConcurrency(entries, 8, async e => {
           const full = path.join(dir, e.name);
-          if (e.isDirectory()) size += await getDirSizeAsync(full);
-          else size += (await fs.stat(full).catch(() => ({ size: 0 }))).size;
-        }));
+          if (e.isDirectory()) return getDirSizeAsync(full);
+          return (await fs.stat(full).catch(() => ({ size: 0 }))).size;
+        });
+        size = sizes.reduce((a, b) => a + b, 0);
       } catch {}
       return size;
     }
@@ -233,7 +255,7 @@ function registerAppManagerHandlers(ipcMain, store, createAppWindow, appWindows)
       toolbar: {
         enabled: !!config.toolbar?.enabled,
         buttons: Array.isArray(config.toolbar?.buttons)
-          ? config.toolbar.buttons.filter(b => ['back','forward','reload','home','pip','notes','devtools','shield','picker','snapshot','settings'].includes(b)).slice(0, 12)
+          ? config.toolbar.buttons.filter(b => ['back','forward','reload','home','pip','notes','devtools','shield','picker','snapshot','settings','broken'].includes(b)).slice(0, 12)
           : ['back','forward','reload','home','pip','notes','devtools'],
       },
       shortcuts: {
@@ -261,6 +283,7 @@ function registerAppManagerHandlers(ipcMain, store, createAppWindow, appWindows)
       },
       catalogId:    config.catalogId   || null,
       pinned:       false,
+      favorite:     false,
       lastUsed:     null,
       openCount:    0,
       installedAt:  Date.now(),
@@ -314,6 +337,7 @@ function registerAppManagerHandlers(ipcMain, store, createAppWindow, appWindows)
     try {
       createAppWindow(data.apps[index], { authorized: true, navigateTo: options.navigateTo || null });
       data.apps[index].openCount = (data.apps[index].openCount || 0) + 1;
+      store.recordDailyUsage?.(data.apps[index], { opens: 1 });
       store.write(data);
       return { success: true };
     } catch (err) {
@@ -341,9 +365,18 @@ function registerAppManagerHandlers(ipcMain, store, createAppWindow, appWindows)
     if (safeUpdates.name && safeUpdates.name !== previousApp.name) {
       removeNativeShortcuts(previousApp);
     }
+    const shortcutFieldChanged = SHORTCUT_FIELDS.some(
+      field => field in safeUpdates && safeUpdates[field] !== previousApp[field]
+    );
     const merged = mergeNestedAppUpdates(data.apps[index], safeUpdates);
     data.apps[index] = typeof store.normalizeApp === 'function' ? store.normalizeApp(merged) : merged;
     store.write(data);
+
+    // Reinstalar accesos directos si cambió algo que afecta su apariencia/destino
+    if (shortcutFieldChanged && (data.settings.desktopShortcuts || data.settings.startMenuShortcuts)) {
+      recreateShortcuts(data.apps[index], data.settings).catch(() => {});
+    }
+
     return data.apps[index];
   });
 
@@ -357,13 +390,41 @@ function registerAppManagerHandlers(ipcMain, store, createAppWindow, appWindows)
     return { pinned: data.apps[index].pinned };
   });
 
+  // ── FAVORITO ──────────────────────────────────────────────────────────────
+  ipcMain.handle('apps:toggle-favorite', async (_event, appId) => {
+    const data  = store.read();
+    const index = data.apps.findIndex(a => a.id === appId);
+    if (index === -1) return { success: false };
+    data.apps[index].favorite = !data.apps[index].favorite;
+    store.write(data);
+    return { favorite: data.apps[index].favorite };
+  });
+
+  // ── ACTUALIZAR ICONOS (acción masiva) ────────────────────────────────────
+  ipcMain.handle('apps:refresh-icons', async (_event, appIds) => {
+    const data = store.read();
+    const targets = Array.isArray(appIds) && appIds.length
+      ? data.apps.filter(a => appIds.includes(a.id))
+      : data.apps;
+    const results = [];
+    for (const appConfig of targets) {
+      try {
+        await ensureAppIcon(appConfig, { force: true });
+        results.push({ appId: appConfig.id, success: true });
+      } catch (err) {
+        results.push({ appId: appConfig.id, success: false, error: err.message });
+      }
+    }
+    return { success: true, results };
+  });
+
   // ── STORAGE INFO (asíncrono) ──────────────────────────────────────────────
   ipcMain.handle('storage:get-info', async () => {
     const data = store.read();
-    const sizes = await Promise.all(data.apps.map(async a => ({
+    const sizes = await mapWithConcurrency(data.apps, 4, async a => ({
       ...a,
       storageBytes: await getSessionSize(a.id),
-    })));
+    }));
     return sizes;
   });
 

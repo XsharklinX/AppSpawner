@@ -1,6 +1,7 @@
 import React, { useEffect, useState, Suspense } from 'react';
 import { ThemeProvider }       from './contexts/ThemeContext';
 import { I18nProvider }        from './contexts/I18nContext';
+import { SoundProvider }       from './contexts/SoundContext';
 import { ToastProvider }       from './contexts/ToastContext';
 import { AppProvider }         from './contexts/AppContext';
 import { WorkspaceProvider }   from './contexts/WorkspaceContext';
@@ -15,7 +16,9 @@ import Discover           from './views/Discover';
 import CreateApp          from './views/CreateApp';
 import Settings           from './views/Settings';
 import Profiles           from './views/Profiles';
+import Insights           from './views/Insights';
 import AppTools           from './views/AppTools';
+import ErrorBoundary      from './components/ErrorBoundary';
 
 /** Spinner de carga inicial mientras se consulta el user del store */
 function LoadingScreen() {
@@ -74,6 +77,7 @@ function AppShell({ currentView, setCurrentView, selectedCategory, setSelectedCa
       case 'create':    return <CreateApp onNavigate={(v) => { setInstallPrefill(null); setCurrentView(v); }} initialData={installPrefill} />;
       case 'settings':  return <Settings />;
       case 'profiles':  return <Profiles onNavigate={setCurrentView} onOpenTools={openTools} />;
+      case 'insights':  return <Insights />;
       case 'app-tools': return (
         <AppTools
           app={toolsApp}
@@ -96,7 +100,7 @@ function AppShell({ currentView, setCurrentView, selectedCategory, setSelectedCa
   return (
     <AppProvider>
       <WorkspaceProvider>
-      <div className="flex flex-col w-screen h-screen overflow-hidden bg-surface-base text-white">
+      <div className="flex flex-col w-screen h-screen overflow-hidden bg-surface-base text-fg">
         <TitleBar currentView={currentView} />
         <div className="flex flex-1 overflow-hidden">
           <Sidebar
@@ -116,7 +120,9 @@ function AppShell({ currentView, setCurrentView, selectedCategory, setSelectedCa
               <div className="absolute -bottom-20 -left-20 w-72 h-72 bg-blue-600/6 rounded-full blur-3xl" />
             </div>
             <div className="relative h-full">
-              {renderView()}
+              <ErrorBoundary key={currentView}>
+                {renderView()}
+              </ErrorBoundary>
             </div>
           </main>
         </div>
@@ -162,21 +168,25 @@ export default function App() {
   if (isOnboarding === null) return <LoadingScreen />;
 
   return (
-    <ThemeProvider>
-      <I18nProvider>
-        <ToastProvider>
-          {isOnboarding ? (
-            <Onboarding onComplete={() => setIsOnboarding(false)} />
-          ) : (
-            <AppShell
-              currentView={currentView}
-              setCurrentView={setCurrentView}
-              selectedCategory={selectedCategory}
-              setSelectedCategory={setSelectedCategory}
-            />
-          )}
-        </ToastProvider>
-      </I18nProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <I18nProvider>
+          <SoundProvider>
+            <ToastProvider>
+              {isOnboarding ? (
+                <Onboarding onComplete={() => setIsOnboarding(false)} />
+              ) : (
+                <AppShell
+                  currentView={currentView}
+                  setCurrentView={setCurrentView}
+                  selectedCategory={selectedCategory}
+                  setSelectedCategory={setSelectedCategory}
+                />
+              )}
+            </ToastProvider>
+          </SoundProvider>
+        </I18nProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSound } from '../../contexts/SoundContext';
 
 /**
  * Switch — Toggle de interruptor estilo macOS.
@@ -12,16 +13,23 @@ export default function Switch({
   disabled  = false,
   size      = 'md', // 'sm' | 'md'
 }) {
+  const { playSound, vibrate } = useSound();
   const sizes = {
     sm: { track: 'w-9 h-5',  thumb: 'w-4 h-4', translate: 'translate-x-4' },
     md: { track: 'w-12 h-6', thumb: 'w-5 h-5', translate: 'translate-x-6' },
   };
   const s = sizes[size] || sizes.md;
 
+  const toggle = () => {
+    playSound(checked ? 'toggleOff' : 'toggleOn');
+    vibrate(8);
+    onChange?.(!checked);
+  };
+
   const handleKeyDown = (e) => {
     if ((e.key === 'Enter' || e.key === ' ') && !disabled) {
       e.preventDefault();
-      onChange?.(!checked);
+      toggle();
     }
   };
 
@@ -33,12 +41,12 @@ export default function Switch({
       {(label || description) && (
         <div className="flex flex-col gap-0.5 flex-1 min-w-0">
           {label && (
-            <span className="text-sm font-medium text-white/80 group-hover:text-white/90 transition-colors">
+            <span className="text-sm font-medium text-fg/80 group-hover:text-fg/90 transition-colors">
               {label}
             </span>
           )}
           {description && (
-            <span className="text-xs text-white/35 leading-relaxed">{description}</span>
+            <span className="text-xs text-fg/35 leading-relaxed">{description}</span>
           )}
         </div>
       )}
@@ -49,13 +57,13 @@ export default function Switch({
         aria-checked={checked}
         tabIndex={disabled ? -1 : 0}
         onKeyDown={handleKeyDown}
-        onClick={() => !disabled && onChange?.(!checked)}
+        onClick={() => !disabled && toggle()}
         className={`
           relative flex-shrink-0 rounded-full transition-all duration-200
           ${s.track}
           ${checked
             ? 'bg-violet-600 border border-violet-400/40 shadow-glow-sm'
-            : 'bg-white/[0.08] border border-white/[0.16]'
+            : 'bg-overlay/[0.08] border border-line/[0.16]'
           }
           focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:ring-offset-2 focus:ring-offset-surface-card
         `}

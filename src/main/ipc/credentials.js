@@ -86,6 +86,12 @@ function parseCSVLine(line) {
 
 function registerCredentialHandlers(ipcMain, appWindows) {
 
+  // Estado del cifrado del OS (DPAPI/Keychain/libsecret). Si no está disponible,
+  // credenciales y códigos TOTP se guardan solo en base64 (no cifrados).
+  ipcMain.handle('credentials:encryption-status', () => {
+    return { available: safeStorage.isEncryptionAvailable() };
+  });
+
   // List all credentials for an app (without passwords)
   ipcMain.handle('credentials:list', (_e, appId) => {
     return readCreds(appId).map(({ id, name, username, url, selectors, createdAt }) =>

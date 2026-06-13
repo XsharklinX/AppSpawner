@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Download, CheckCircle2, Sparkles } from 'lucide-react';
+import { Search, Download, CheckCircle2, Sparkles, Wand2 } from 'lucide-react';
 import AppIcon           from '../components/common/AppIcon';
 import { useApps }        from '../contexts/AppContext';
 import { useI18n }        from '../contexts/I18nContext';
@@ -32,6 +32,26 @@ export default function Discover({ onNavigate }) {
 
   const featuredApps = DISCOVER_APPS.filter(a => a.featured);
 
+  // Recomendadas según las categorías de las apps ya instaladas
+  const recommendedApps = useMemo(() => {
+    if (!apps.length) return [];
+    const categoryCounts = {};
+    for (const a of apps) {
+      if (a.category) categoryCounts[a.category] = (categoryCounts[a.category] || 0) + 1;
+    }
+    const topCategories = Object.entries(categoryCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([cat]) => cat);
+    if (!topCategories.length) return [];
+    return DISCOVER_APPS
+      .filter(app => topCategories.includes(app.category) && !installedUrls.has(app.url.replace(/\/$/, '')))
+      .sort((a, b) =>
+        (topCategories.indexOf(a.category) - topCategories.indexOf(b.category)) ||
+        ((b.rating || 0) - (a.rating || 0))
+      )
+      .slice(0, 8);
+  }, [apps, installedUrls]);
+
   const handleInstall = async (catalogApp) => {
     if (isInstalled(catalogApp) || installing[catalogApp.id]) return;
     setInstalling(prev => ({ ...prev, [catalogApp.id]: true }));
@@ -57,12 +77,12 @@ export default function Discover({ onNavigate }) {
       <div className="flex-shrink-0 px-7 pt-6 pb-4">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
-            <h1 className="text-xl font-bold text-white">{t('disc_title')}</h1>
-            <p className="text-sm text-white/35 mt-0.5 max-w-md">{t('disc_subtitle')}</p>
+            <h1 className="text-xl font-bold text-fg">{t('disc_title')}</h1>
+            <p className="text-sm text-fg/35 mt-0.5 max-w-md">{t('disc_subtitle')}</p>
           </div>
           {/* Búsqueda */}
           <div className="relative w-64 flex-shrink-0">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg/25 pointer-events-none" />
             <input
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
@@ -82,7 +102,7 @@ export default function Discover({ onNavigate }) {
                 flex-shrink-0 text-xs font-medium px-3.5 py-1.5 rounded-full transition-all duration-150
                 ${filterCat === cat.id
                   ? 'bg-violet-600/30 text-violet-300 border border-violet-500/30'
-                  : 'bg-white/[0.04] text-white/45 hover:text-white/70 hover:bg-white/[0.07] border border-white/[0.05]'
+                  : 'bg-overlay/[0.04] text-fg/45 hover:text-fg/70 hover:bg-overlay/[0.07] border border-line/[0.05]'
                 }
               `}
             >
@@ -100,7 +120,7 @@ export default function Discover({ onNavigate }) {
           <section className="mb-7">
             <div className="flex items-center gap-2 mb-3">
               <Sparkles size={14} className="text-amber-400" />
-              <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider">
+              <h2 className="text-sm font-semibold text-fg/60 uppercase tracking-wider">
                 {t('disc_featured')}
               </h2>
             </div>
@@ -121,11 +141,36 @@ export default function Discover({ onNavigate }) {
           </section>
         )}
 
+        {/* Recomendadas según las apps instaladas (solo si no hay filtro activo) */}
+        {!searchQuery && filterCat === 'all' && recommendedApps.length > 0 && (
+          <section className="mb-7">
+            <div className="flex items-center gap-2 mb-3">
+              <Wand2 size={14} className="text-violet-400" />
+              <h2 className="text-sm font-semibold text-fg/60 uppercase tracking-wider">
+                Recomendadas para ti
+              </h2>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {recommendedApps.map(app => (
+                <DiscoverCard
+                  key={app.id}
+                  app={app}
+                  installed={isInstalled(app)}
+                  installing={!!installing[app.id]}
+                  onInstall={() => handleInstall(app)}
+                  t={t}
+                  language={language}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Todas las apps */}
         {filteredApps.length > 0 ? (
           <section>
             {(!searchQuery && filterCat === 'all') && (
-              <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-3">
+              <h2 className="text-sm font-semibold text-fg/60 uppercase tracking-wider mb-3">
                 {t('disc_all')}
               </h2>
             )}
@@ -150,8 +195,8 @@ export default function Discover({ onNavigate }) {
           </section>
         ) : (
           <div className="flex flex-col items-center justify-center h-40 gap-2">
-            <Search size={24} className="text-white/15" />
-            <p className="text-sm text-white/30">No se encontraron apps para "{searchQuery}"</p>
+            <Search size={24} className="text-fg/15" />
+            <p className="text-sm text-fg/30">No se encontraron apps para "{searchQuery}"</p>
           </div>
         )}
       </div>
@@ -165,10 +210,10 @@ function DiscoverCard({ app, installed, installing, onInstall, t, language, feat
   return (
     <div className={`
       relative rounded-2xl overflow-hidden flex flex-col gap-0 group
-      transition-all duration-200 border border-white/[0.06]
+      transition-all duration-200 border border-line/[0.06]
       ${installed
         ? 'opacity-55 cursor-default'
-        : 'hover:shadow-card-hover hover:-translate-y-[2px] hover:border-white/[0.1] cursor-pointer'}
+        : 'hover:shadow-card-hover hover:-translate-y-[2px] hover:border-line/[0.1] cursor-pointer'}
     `}
     style={{ background: `linear-gradient(135deg, ${app.iconColor}12 0%, #0d0d18 60%)` }}
     >
@@ -194,15 +239,15 @@ function DiscoverCard({ app, installed, installing, onInstall, t, language, feat
               </span>
             )}
             {app.rating && (
-              <span className="text-[9px] text-white/30 font-medium">★ {app.rating}</span>
+              <span className="text-[9px] text-fg/30 font-medium">★ {app.rating}</span>
             )}
           </div>
         </div>
 
         {/* Info */}
         <div className="flex-1">
-          <h3 className="text-sm font-bold text-white/90 leading-tight">{app.name}</h3>
-          <p className="text-[11px] text-white/40 mt-1.5 leading-relaxed line-clamp-2">{desc}</p>
+          <h3 className="text-sm font-bold text-fg/90 leading-tight">{app.name}</h3>
+          <p className="text-[11px] text-fg/40 mt-1.5 leading-relaxed line-clamp-2">{desc}</p>
         </div>
 
         {/* Install button */}
